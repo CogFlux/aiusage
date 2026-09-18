@@ -5,13 +5,15 @@ import Foundation
 public enum UsageFormatter {
     /// Title for the menu bar, e.g. "5h 42% ▲9", "5h 42% ▼3", "5h 42% ●", "5h 0% ↺", "5h —".
     /// `compact` reduces it to the bare percentage ("42%", "—") for crowded menu bars.
-    public static func menuBarTitle(kind: WindowKind, pace: Pace?, stale: Bool, compact: Bool = false) -> String {
+    /// `idle` marks "no active window right now" (Claude drops a window after its reset until the
+    /// next message starts a new one), shown as "5h ↺" rather than the no-data dash.
+    public static func menuBarTitle(kind: WindowKind, pace: Pace?, stale: Bool, compact: Bool = false, idle: Bool = false) -> String {
         if compact {
-            guard let pace else { return "—" }
+            guard let pace else { return idle ? "↺" : "—" }
             return percent(pace.usedPercent)
         }
         var s = kind.shortLabel + " "
-        guard let pace else { return s + "—" }
+        guard let pace else { return s + (idle ? "↺" : "—") }
         switch pace.status {
         case .reset:
             s += "0% ↺"

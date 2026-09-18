@@ -199,9 +199,15 @@ final class UsageStore: ObservableObject {
         return now.timeIntervalSince(snapshot.observedAt) > staleAfter
     }
 
+    /// We have data from Claude, but this window is currently absent: it ended and the next
+    /// message will start a new one.
+    func isIdle(_ kind: WindowKind) -> Bool {
+        snapshot != nil && snapshot?.window(kind) == nil
+    }
+
     var menuBarTitle: String {
         UsageFormatter.menuBarTitle(kind: menuBarKind, pace: pace(for: menuBarKind), stale: isStale,
-                                    compact: compactMenuBar)
+                                    compact: compactMenuBar, idle: isIdle(menuBarKind))
     }
 
     var resolvedClaudePath: String? {

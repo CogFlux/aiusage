@@ -19,6 +19,7 @@ struct MenuContentView: View {
                 WindowRow(kind: kind,
                           window: store.snapshot?.window(kind),
                           pace: store.pace(for: kind),
+                          idle: store.isIdle(kind),
                           now: store.now,
                           strings: s,
                           locale: store.locale)
@@ -146,6 +147,7 @@ struct WindowRow: View {
     let kind: WindowKind
     let window: UsageWindow?
     let pace: Pace?
+    let idle: Bool
     let now: Date
     let strings: Strings
     let locale: Locale

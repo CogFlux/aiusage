@@ -53,6 +53,7 @@ struct Strings {
     let tooEarlyNote: String
     let resetNote: String
     let noData: String
+    let windowIdle: String
 
     // Claude Code availability
     let claudeCodeMissingTitle: String
@@ -153,6 +154,7 @@ struct Strings {
         tooEarlyNote: "Window just started; no projection yet",
         resetNote: "Window has reset; waiting for new data",
         noData: "No data",
+        windowIdle: "No active window. Your next message to Claude starts a new one.",
 
         claudeCodeMissingTitle: "Claude Code not found",
         claudeCodeMissingBody: "AIUsage reads your quota through Claude Code, which is not installed on this Mac (or is not on your PATH — set its location in Settings → Claude Code).",
@@ -231,6 +233,7 @@ struct Strings {
         tooEarlyNote: "窗口刚开始，暂不投影",
         resetNote: "窗口已重置，等待下一次数据",
         noData: "暂无数据",
+        windowIdle: "当前没有活跃窗口。下一条发给 Claude 的消息会开启新窗口。",
 
         claudeCodeMissingTitle: "未找到 Claude Code",
         claudeCodeMissingBody: "AIUsage 通过 Claude Code 读取额度，但这台 Mac 上没有安装它（或它不在 PATH 里——可在 设置 → Claude Code 指定位置）。",

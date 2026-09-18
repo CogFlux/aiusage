@@ -10,6 +10,7 @@ enum UsageFormatterChecks {
     static func run() {
         menuBarTitles()
         compactMenuBarTitles()
+        idleTitles()
         countdown()
         signed()
     }
@@ -22,6 +23,11 @@ enum UsageFormatterChecks {
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.tooEarly, used: 3), stale: false), "5h 3%", "too early")
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.reset, used: 0), stale: false), "5h 0% ↺", "reset")
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.onTrack), stale: true), "5h 42% ● ⧗", "stale marker")
+    }
+
+    static func idleTitles() {
+        Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: nil, stale: false, idle: true), "5h ↺", "idle window")
+        Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: nil, stale: false, compact: true, idle: true), "↺", "idle compact")
     }
 
     static func compactMenuBarTitles() {
