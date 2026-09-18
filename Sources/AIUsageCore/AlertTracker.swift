@@ -15,6 +15,13 @@ public struct UsageAlert: Equatable, Sendable {
     public var resetsAt: Date
     /// Pace at the moment of firing. For `windowReset` it is the last pace seen before the reset.
     public var pace: Pace
+
+    public init(kind: AlertKind, window: WindowKind, resetsAt: Date, pace: Pace) {
+        self.kind = kind
+        self.window = window
+        self.resetsAt = resetsAt
+        self.pace = pace
+    }
 }
 
 public struct AlertConfig: Equatable, Sendable {
