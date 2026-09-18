@@ -31,6 +31,7 @@ struct DeepSeekSection: View {
 
             if !deepseek.hasAPIKey {
                 Text(s.deepseekNoKey).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if let latest = deepseek.latest {
                 HStack(spacing: 14) {
                     stat(s.deepseekBalance, deepseek.money(latest.total))
@@ -50,12 +51,14 @@ struct DeepSeekSection: View {
                 }
                 if deepseek.burnRatePerDay == nil {
                     Text(s.deepseekGathering).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if let pace = deepseek.budgetPace {
                     budget(pace)
                 }
             } else if let error = deepseek.lastError {
                 Text(error).font(.caption).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
             }
