@@ -35,7 +35,8 @@ Packaged releases check for updates through [Sparkle](https://sparkle-project.or
 
 Gear icon in the menu → Settings window.
 
-- **General**: language, which window the menu bar shows (5h / 7d), compact menu bar (just `42%`).
+- **General**: language, which window the menu bar shows (5h / 7d), compact menu bar (just `42%`), launch at login,
+  notifications (over pace, running out before the reset, 5-hour window reset) with a test button, update checks.
 - **Claude Code**: hook status and install, whether the hook also prints a usage line into Claude Code's own
   status line (only when you had none of your own; toggles at the next refresh, no restart), `claude` path.
 
@@ -95,4 +96,4 @@ MIT — see [LICENSE](LICENSE).
 - [x] In-app updates (Sparkle)
 - [ ] Show 5h and 7d side by side in the menu bar
 - [ ] Other providers (Codex / Cursor …) — anything that produces a `UsageSnapshot`
-- [ ] Launch at login, notifications (over pace / about to run out)
+- [x] Launch at login, notifications (over pace / running out / window reset)

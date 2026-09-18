@@ -16,6 +16,7 @@ struct SettingsView: View {
         }
         .frame(width: 460)
         .padding(.bottom, 4)
+        .onAppear { store.refreshNotificationStatus() }
     }
 
     private var generalTab: some View {
@@ -50,10 +51,16 @@ struct SettingsView: View {
                     Toggle(s.notifyOverPace, isOn: $store.notifyOverPace)
                     Toggle(s.notifyRunningOut, isOn: $store.notifyRunningOut)
                     Toggle(s.notifyWindowReset, isOn: $store.notifyWindowReset)
-                    HStack {
-                        if store.notificationsDenied {
-                            Text(s.notificationsDenied).font(.caption).foregroundStyle(.red)
+                    if store.notificationStatus.denied || store.notificationStatus.bannersOff {
+                        HStack(alignment: .top) {
+                            Text(store.notificationStatus.denied ? s.notificationsDenied : s.notificationsBannersOff)
+                                .font(.caption)
+                                .foregroundStyle(store.notificationStatus.denied ? .red : .orange)
+                            Spacer()
+                            Button(s.openNotificationSettings) { store.openNotificationSettings() }
                         }
+                    }
+                    HStack {
                         Spacer()
                         Button(s.sendTestNotification) { store.sendTestNotification() }
                     }

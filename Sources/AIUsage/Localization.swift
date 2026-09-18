@@ -88,6 +88,8 @@ struct Strings {
     let notifyWindowReset: String
     let notificationsDenied: String
     let sendTestNotification: String
+    let notificationsBannersOff: String
+    let openNotificationSettings: String
     let alertOverPaceTitle: (_ window: String) -> String
     let alertOverPaceBody: (_ used: String, _ delta: String, _ projected: String, _ resetTime: String) -> String
     let alertRunningOutTitle: (_ window: String) -> String
@@ -182,6 +184,8 @@ struct Strings {
         notifyWindowReset: "When the 5-hour window resets",
         notificationsDenied: "Notifications are turned off for AIUsage in System Settings → Notifications.",
         sendTestNotification: "Send test notification",
+        notificationsBannersOff: "Notifications are allowed but the alert style is \"None\", so they only appear in Notification Center. Choose Banners or Alerts in System Settings.",
+        openNotificationSettings: "Open System Settings",
         alertOverPaceTitle: { "\($0) over pace" },
         alertOverPaceBody: { used, delta, projected, reset in "\(used) used, \(delta) vs budget. Heading for \(projected) by the reset at \(reset)." },
         alertRunningOutTitle: { "\($0) running out" },
@@ -258,6 +262,8 @@ struct Strings {
         notifyWindowReset: "5 小时窗口重置时",
         notificationsDenied: "AIUsage 的通知已在 系统设置 → 通知 中被关闭。",
         sendTestNotification: "发送测试通知",
+        notificationsBannersOff: "通知已允许，但提示样式为\"无\"，所以只会出现在通知中心里不会弹出。请在系统设置里改为\"横幅\"或\"提醒\"。",
+        openNotificationSettings: "打开系统设置",
         alertOverPaceTitle: { "\($0)超速" },
         alertOverPaceBody: { used, delta, projected, reset in "已用 \(used)，比预算 \(delta)。按此速度到 \(reset) 重置时将达 \(projected)。" },
         alertRunningOutTitle: { "\($0)即将用尽" },

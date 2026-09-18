@@ -1,4 +1,5 @@
 import AIUsageCore
+import AppKit
 import Combine
 import Foundation
 
@@ -75,7 +76,7 @@ final class UsageStore: ObservableObject {
     @Published var notifyOverPace: Bool { didSet { notificationSettingChanged(notifyOverPace, key: Keys.notifyOverPace) } }
     @Published var notifyRunningOut: Bool { didSet { notificationSettingChanged(notifyRunningOut, key: Keys.notifyRunningOut) } }
     @Published var notifyWindowReset: Bool { didSet { notificationSettingChanged(notifyWindowReset, key: Keys.notifyWindowReset) } }
-    @Published private(set) var notificationsDenied = false
+    @Published private(set) var notificationStatus = Notifier.Status()
 
     @Published var launchAtLogin: Bool {
         didSet {
@@ -125,14 +126,33 @@ final class UsageStore: ObservableObject {
     private func tick() {
         now = Date()
         evaluateAlerts()
+        if notifyOverPace || notifyRunningOut || notifyWindowReset {
+            refreshNotificationStatus()
+        }
+    }
+
+    /// Re-reads the system authorization so the Settings hints follow changes the user makes in
+    /// System Settings without a relaunch. Called on tick, on Settings appearing, and after requests.
+    func refreshNotificationStatus() {
+        guard notifier.isSupported else { return }
+        Task {
+            let status = await notifier.status()
+            if status != notificationStatus { notificationStatus = status }
+        }
+    }
+
+    func openNotificationSettings() {
+        if let url = Notifier.systemSettingsURL {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func notificationSettingChanged(_ enabled: Bool, key: String) {
         UserDefaults.standard.set(enabled, forKey: key)
         guard enabled else { return }
         Task {
-            let granted = await notifier.requestAuthorization()
-            notificationsDenied = !granted && notifier.isSupported
+            _ = await notifier.requestAuthorization()
+            refreshNotificationStatus()
         }
     }
 
@@ -140,7 +160,7 @@ final class UsageStore: ObservableObject {
     func sendTestNotification() {
         Task {
             let granted = await notifier.requestAuthorization()
-            notificationsDenied = !granted && notifier.isSupported
+            refreshNotificationStatus()
             guard granted else { return }
             let resets = Date().addingTimeInterval(2 * 3600)
             let window = UsageWindow(kind: menuBarKind, usedPercent: 42, resetsAt: resets)

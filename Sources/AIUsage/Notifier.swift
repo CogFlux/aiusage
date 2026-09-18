@@ -5,8 +5,43 @@ import UserNotifications
 /// Delivers `UsageAlert`s as macOS notifications. UserNotifications needs a real bundle, so a bare
 /// `swift run` binary (no bundle identifier) silently does nothing.
 @MainActor
-final class Notifier {
+final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     var isSupported: Bool { Bundle.main.bundleIdentifier != nil }
+
+    override init() {
+        super.init()
+        if isSupported {
+            UNUserNotificationCenter.current().delegate = self
+        }
+    }
+
+    /// macOS suppresses banners while the posting app is frontmost (e.g. the user just pressed
+    /// "Send test notification" in our Settings window). Ask for the banner anyway.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
+    }
+
+    struct Status: Equatable {
+        var denied = false
+        /// Authorized, but the user set the alert style to "None": notifications only reach
+        /// Notification Center and never pop up.
+        var bannersOff = false
+    }
+
+    func status() async -> Status {
+        guard isSupported else { return Status() }
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return Status(denied: settings.authorizationStatus == .denied,
+                      bannersOff: settings.authorizationStatus == .authorized && settings.alertStyle == .none)
+    }
+
+    /// Deep link to this app's page in System Settings → Notifications.
+    static var systemSettingsURL: URL? {
+        guard let id = Bundle.main.bundleIdentifier else { return nil }
+        return URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)")
+    }
 
     /// Asks for permission the first time a notification kind is enabled. Returns whether granted.
     func requestAuthorization() async -> Bool {
