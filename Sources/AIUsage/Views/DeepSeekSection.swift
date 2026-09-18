@@ -36,11 +36,16 @@ struct DeepSeekSection: View {
                     stat(s.deepseekBalance, deepseek.money(latest.total))
                     stat(s.deepseekToday, deepseek.money(deepseek.spentToday))
                     stat(s.deepseekThisMonth, deepseek.money(deepseek.spentThisMonth))
+                    // Placeholders keep the row stable while the ledger is too young for a rate.
                     if let rate = deepseek.burnRate {
                         stat(s.deepseekPerDayBasis(spanLabel(rate.span)), deepseek.money(rate.perDay))
+                    } else {
+                        stat(s.deepseekPerDay, "—", color: .secondary)
                     }
                     if let runout = deepseek.runoutDate {
                         stat(s.deepseekRunsOut, runout.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(store.locale)))
+                    } else {
+                        stat(s.deepseekRunsOut, "—", color: .secondary)
                     }
                 }
                 if deepseek.burnRatePerDay == nil {

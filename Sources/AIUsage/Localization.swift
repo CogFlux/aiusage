@@ -225,7 +225,7 @@ struct Strings {
         deepseekBalance: "Balance",
         deepseekToday: "Today",
         deepseekThisMonth: "This month",
-        deepseekPerDay: "per day",
+        deepseekPerDay: "/day",
         deepseekPerDayBasis: { "/day (\($0))" },
         justNow: "just now",
         deepseekRunsOut: "Runs out",
