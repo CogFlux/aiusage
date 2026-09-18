@@ -100,5 +100,6 @@ MIT，见 [LICENSE](LICENSE)。
 - [x] 应用内更新（Sparkle）
 - [ ] 菜单栏同时显示 5h 和 7d
 - [x] DeepSeek 余额、燃烧率与月预算 pace
+- [ ] 可自定义的展开面板：选择显示哪些 provider 区块及其顺序（如只显示 Claude，或把 DeepSeek 放在 Claude 上面）
 - [ ] 其他 provider（Codex / Cursor …）
 - [x] 开机自启、通知（超速 / 即将用尽 / 窗口重置）

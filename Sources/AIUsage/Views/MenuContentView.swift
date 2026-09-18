@@ -28,7 +28,7 @@ struct MenuContentView: View {
             Divider()
             probeSection
             if deepseek.enabled {
-                Divider()
+                ProviderDivider()
                 DeepSeekSection()
             }
             if !store.hookInstalled, store.claudeCodeInstalled {
@@ -221,6 +221,17 @@ struct WindowRow: View {
         case .underPace: return .green
         case .onTrack, .tooEarly, .reset: return .primary
         }
+    }
+}
+
+/// Boundary between providers: heavier and more spaced than the thin dividers used inside one
+/// provider's block, so the two levels of grouping read differently.
+struct ProviderDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.18))
+            .frame(height: 2)
+            .padding(.vertical, 6)
     }
 }
 

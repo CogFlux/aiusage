@@ -106,5 +106,6 @@ MIT — see [LICENSE](LICENSE).
 - [x] In-app updates (Sparkle)
 - [ ] Show 5h and 7d side by side in the menu bar
 - [x] DeepSeek balance, burn rate and monthly budget pace
+- [ ] Customizable popover: choose which provider blocks are shown and in what order (e.g. Claude only, or DeepSeek above Claude)
 - [ ] Other providers (Codex / Cursor …)
 - [x] Launch at login, notifications (over pace / running out / window reset)
