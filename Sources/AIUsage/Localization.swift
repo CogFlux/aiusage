@@ -92,6 +92,7 @@ struct Strings {
     let deepseekRefresh: String
     let deepseekMonthlyBudget: String
     let deepseekMonthlyBudgetHint: String
+    let deepseekMonthlyBudgetAmount: String
     let deepseekLowBalance: String
     let deepseekNotifyLowBalance: String
     let deepseekBalance: String
@@ -215,7 +216,8 @@ struct Strings {
         deepseekSave: "Save",
         deepseekRefresh: "Refresh now",
         deepseekMonthlyBudget: "Monthly budget",
-        deepseekMonthlyBudgetHint: "Optional. With a budget, the month is paced like a Claude window: an even-pace line, over/under markers and the same notifications. 0 turns it off.",
+        deepseekMonthlyBudgetHint: "Pace the month like a Claude window: an even-pace line, over/under markers and the same notifications.",
+        deepseekMonthlyBudgetAmount: "Amount per month",
         deepseekLowBalance: "Low-balance threshold",
         deepseekNotifyLowBalance: "Notify when the balance drops below the threshold",
         deepseekBalance: "Balance",
@@ -320,7 +322,8 @@ struct Strings {
         deepseekSave: "保存",
         deepseekRefresh: "立即刷新",
         deepseekMonthlyBudget: "月预算",
-        deepseekMonthlyBudgetHint: "可选。设了预算后，本月会像 Claude 窗口一样做 pace：匀速线、超/省标记和同样的通知。0 表示不用。",
+        deepseekMonthlyBudgetHint: "把本月当作 Claude 窗口一样做 pace：匀速线、超/省标记和同样的通知。",
+        deepseekMonthlyBudgetAmount: "每月金额",
         deepseekLowBalance: "余额不足阈值",
         deepseekNotifyLowBalance: "余额低于阈值时通知",
         deepseekBalance: "余额",

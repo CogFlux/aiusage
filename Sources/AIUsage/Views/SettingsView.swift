@@ -43,12 +43,15 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
             }
 
-            Picker(s.menuBarShows, selection: $store.menuBarKind) {
-                ForEach(WindowKind.allCases, id: \.self) { kind in
-                    Text(kind.shortLabel).tag(kind)
+            // The 5h/7d choice only matters while the menu bar shows Claude.
+            if !deepseek.enabled || store.menuBarProvider == .claude {
+                Picker(s.menuBarShows, selection: $store.menuBarKind) {
+                    ForEach(WindowKind.allCases, id: \.self) { kind in
+                        Text(kind.shortLabel).tag(kind)
+                    }
                 }
+                .pickerStyle(.segmented)
             }
-            .pickerStyle(.segmented)
 
             Toggle(isOn: $store.compactMenuBar) {
                 Text(s.compactMenuBar)
@@ -127,8 +130,13 @@ struct SettingsView: View {
             }
 
             Section {
-                TextField(s.deepseekMonthlyBudget, value: $deepseek.monthlyBudget, format: .number)
-                Text(s.deepseekMonthlyBudgetHint).font(.caption).foregroundStyle(.secondary)
+                Toggle(isOn: $deepseek.budgetEnabled) {
+                    Text(s.deepseekMonthlyBudget)
+                    Text(s.deepseekMonthlyBudgetHint)
+                }
+                if deepseek.budgetEnabled {
+                    TextField(s.deepseekMonthlyBudgetAmount, value: $deepseek.monthlyBudget, format: .number)
+                }
             }
 
             Section {

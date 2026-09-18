@@ -10,6 +10,7 @@ final class DeepSeekStore: ObservableObject {
     private enum Keys {
         static let enabled = "deepseekEnabled"
         static let monthlyBudget = "deepseekMonthlyBudget"
+        static let budgetEnabled = "deepseekBudgetEnabled"
         static let lowBalance = "deepseekLowBalance"
         static let notifyLowBalance = "deepseekNotifyLowBalance"
     }
@@ -27,9 +28,13 @@ final class DeepSeekStore: ObservableObject {
         }
     }
     @Published private(set) var hasAPIKey: Bool
-    /// Monthly spend budget in the account's currency; 0 means "no budget, just show burn rate".
+    /// Monthly spend budget in the account's currency. Only paced while `budgetEnabled` is on, so
+    /// the amount survives toggling the budget off and on.
     @Published var monthlyBudget: Double {
         didSet { UserDefaults.standard.set(monthlyBudget, forKey: Keys.monthlyBudget); evaluateAlerts() }
+    }
+    @Published var budgetEnabled: Bool {
+        didSet { UserDefaults.standard.set(budgetEnabled, forKey: Keys.budgetEnabled); evaluateAlerts() }
     }
     @Published var lowBalanceThreshold: Double {
         didSet { UserDefaults.standard.set(lowBalanceThreshold, forKey: Keys.lowBalance); evaluateAlerts() }
@@ -61,6 +66,7 @@ final class DeepSeekStore: ObservableObject {
         let defaults = UserDefaults.standard
         enabled = defaults.bool(forKey: Keys.enabled)
         monthlyBudget = defaults.double(forKey: Keys.monthlyBudget)
+        budgetEnabled = defaults.bool(forKey: Keys.budgetEnabled)
         lowBalanceThreshold = defaults.object(forKey: Keys.lowBalance) == nil ? 10 : defaults.double(forKey: Keys.lowBalance)
         notifyLowBalance = defaults.bool(forKey: Keys.notifyLowBalance)
         hasAPIKey = FileManager.default.fileExists(atPath: Self.keyFileURL.path)
@@ -165,7 +171,7 @@ final class DeepSeekStore: ObservableObject {
     var runoutDate: Date? { ledger.runoutDate(ratePerDay: burnRatePerDay, now: now) }
 
     var budgetWindow: PaceWindow? {
-        guard monthlyBudget > 0 else { return nil }
+        guard budgetEnabled, monthlyBudget > 0 else { return nil }
         let month = monthInterval
         return PaceWindow(id: Self.windowID, usedPercent: spentThisMonth / monthlyBudget * 100,
                           startsAt: month.start, resetsAt: month.end,

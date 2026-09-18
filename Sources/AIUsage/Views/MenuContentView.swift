@@ -188,6 +188,8 @@ struct WindowRow: View {
                 } else if pace.status == .reset {
                     note(strings.resetNote)
                 }
+            } else if idle {
+                Text(strings.windowIdle).font(.caption).foregroundStyle(.secondary)
             } else {
                 Text(strings.noData).foregroundStyle(.secondary)
             }
