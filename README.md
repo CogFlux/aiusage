@@ -2,8 +2,8 @@
 
 English · [中文](README.zh-CN.md)
 
-A macOS menu bar app that shows your Claude subscription quota (5-hour and 7-day windows) together with
-**pace**: assuming you want to land at exactly 99% when the window resets, how much should be used by now,
+A macOS menu bar app that shows your Claude subscription quota (5-hour and 7-day windows) — and, optionally,
+your DeepSeek balance and burn rate — together with **pace**: assuming you want to land at exactly 99% when the window resets, how much should be used by now,
 how much actually is, whether you are ahead or behind, and when you would run out at the current rate.
 
 ```
@@ -41,6 +41,14 @@ Gear icon in the menu → Settings window.
   notifications (over pace, running out before the reset, 5-hour window reset) with a test button, update checks.
 - **Claude Code**: hook status and install, whether the hook also prints a usage line into Claude Code's own
   status line (only when you had none of your own; toggles at the next refresh, no restart), `claude` path.
+
+## DeepSeek
+
+Settings → DeepSeek. Paste an API key and the app polls the free balance endpoint every 5 minutes, derives
+today's / this month's spend and a per-day burn rate from balance changes, and estimates when the balance runs
+out. Set a monthly budget to pace the month exactly like a Claude window (markers, notifications, menu bar
+`DS 42% ▲6`). The key is stored owner-only under `~/Library/Application Support/AIUsage/` and is sent only to
+`api.deepseek.com/user/balance`.
 
 ## Language
 
@@ -97,5 +105,6 @@ MIT — see [LICENSE](LICENSE).
 - [x] Claude: passive statusline + active `claude -p`
 - [x] In-app updates (Sparkle)
 - [ ] Show 5h and 7d side by side in the menu bar
-- [ ] Other providers (Codex / Cursor …) — anything that produces a `UsageSnapshot`
+- [x] DeepSeek balance, burn rate and monthly budget pace
+- [ ] Other providers (Codex / Cursor …)
 - [x] Launch at login, notifications (over pace / running out / window reset)

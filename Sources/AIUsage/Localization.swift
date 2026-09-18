@@ -81,6 +81,32 @@ struct Strings {
     let hookResourceMissing: String
     let hookSettingsNotObject: String
 
+    // DeepSeek
+    let deepseekBudgetTitle: String
+    let deepseekEnable: String
+    let deepseekEnableHint: String
+    let deepseekAPIKey: String
+    let deepseekAPIKeyHint: String
+    let deepseekAPIKeySaved: String
+    let deepseekSave: String
+    let deepseekRefresh: String
+    let deepseekMonthlyBudget: String
+    let deepseekMonthlyBudgetHint: String
+    let deepseekLowBalance: String
+    let deepseekNotifyLowBalance: String
+    let deepseekBalance: String
+    let deepseekToday: String
+    let deepseekThisMonth: String
+    let deepseekPerDay: String
+    let deepseekRunsOut: String
+    let deepseekGathering: String
+    let deepseekNoKey: String
+    let deepseekUnauthorized: String
+    let deepseekMalformed: String
+    let deepseekSpent: String
+    let alertLowBalanceTitle: String
+    let alertLowBalanceBody: (_ amount: String, _ runout: String?) -> String
+
     // Startup & notifications
     let launchAtLogin: String
     let notifications: String
@@ -109,6 +135,7 @@ struct Strings {
     let general: String
     let claudeCode: String
     let menuBarShows: String
+    let menuBarProvider: String
     let compactMenuBar: String
     let compactMenuBarHint: String
     let language: String
@@ -179,6 +206,31 @@ struct Strings {
         hookResourceMissing: "aiusage-statusline.sh is missing from the app bundle",
         hookSettingsNotObject: "~/.claude/settings.json is not a JSON object",
 
+        deepseekBudgetTitle: "DeepSeek monthly budget",
+        deepseekEnable: "Track DeepSeek balance",
+        deepseekEnableHint: "Polls the balance endpoint every 5 minutes. It is free and sends no model requests; spend is derived from balance changes, so amounts under ¥0.01 show up once they accumulate.",
+        deepseekAPIKey: "API key",
+        deepseekAPIKeyHint: "Stored in ~/Library/Application Support/AIUsage/deepseek.key (owner-only permissions) and sent only to api.deepseek.com/user/balance.",
+        deepseekAPIKeySaved: "Key saved",
+        deepseekSave: "Save",
+        deepseekRefresh: "Refresh now",
+        deepseekMonthlyBudget: "Monthly budget",
+        deepseekMonthlyBudgetHint: "Optional. With a budget, the month is paced like a Claude window: an even-pace line, over/under markers and the same notifications. 0 turns it off.",
+        deepseekLowBalance: "Low-balance threshold",
+        deepseekNotifyLowBalance: "Notify when the balance drops below the threshold",
+        deepseekBalance: "Balance",
+        deepseekToday: "Today",
+        deepseekThisMonth: "This month",
+        deepseekPerDay: "per day",
+        deepseekRunsOut: "Runs out",
+        deepseekGathering: "Gathering history — burn rate appears after ~6 hours.",
+        deepseekNoKey: "Add your DeepSeek API key in Settings → DeepSeek.",
+        deepseekUnauthorized: "DeepSeek rejected the API key (401).",
+        deepseekMalformed: "Unexpected response from DeepSeek.",
+        deepseekSpent: "Spent",
+        alertLowBalanceTitle: "DeepSeek balance low",
+        alertLowBalanceBody: { amount, runout in runout.map { "\(amount) left — runs out around \($0) at the current rate." } ?? "\(amount) left." },
+
         launchAtLogin: "Launch at login",
         notifications: "Notifications",
         notifyOverPace: "When a window goes over pace",
@@ -204,6 +256,7 @@ struct Strings {
         general: "General",
         claudeCode: "Claude Code",
         menuBarShows: "Menu bar window",
+        menuBarProvider: "Menu bar shows",
         compactMenuBar: "Compact menu bar",
         compactMenuBarHint: "Show only the percentage (\"42%\") instead of \"5h 42% ▲9\". For crowded menu bars.",
         language: "Language",
@@ -258,6 +311,31 @@ struct Strings {
         hookResourceMissing: "App 包里缺少 aiusage-statusline.sh",
         hookSettingsNotObject: "~/.claude/settings.json 不是 JSON 对象",
 
+        deepseekBudgetTitle: "DeepSeek 月预算",
+        deepseekEnable: "跟踪 DeepSeek 余额",
+        deepseekEnableHint: "每 5 分钟查询一次余额接口。免费、不发任何模型请求；花费由余额变化推算，不足 ¥0.01 的消耗会在累计后显示。",
+        deepseekAPIKey: "API key",
+        deepseekAPIKeyHint: "保存在 ~/Library/Application Support/AIUsage/deepseek.key（仅本用户可读），只会发送到 api.deepseek.com/user/balance。",
+        deepseekAPIKeySaved: "已保存",
+        deepseekSave: "保存",
+        deepseekRefresh: "立即刷新",
+        deepseekMonthlyBudget: "月预算",
+        deepseekMonthlyBudgetHint: "可选。设了预算后，本月会像 Claude 窗口一样做 pace：匀速线、超/省标记和同样的通知。0 表示不用。",
+        deepseekLowBalance: "余额不足阈值",
+        deepseekNotifyLowBalance: "余额低于阈值时通知",
+        deepseekBalance: "余额",
+        deepseekToday: "今日",
+        deepseekThisMonth: "本月",
+        deepseekPerDay: "每天",
+        deepseekRunsOut: "用尽",
+        deepseekGathering: "正在积累历史，约 6 小时后显示燃烧率。",
+        deepseekNoKey: "请在 设置 → DeepSeek 填入 API key。",
+        deepseekUnauthorized: "DeepSeek 拒绝了这个 API key（401）。",
+        deepseekMalformed: "DeepSeek 返回了意外的内容。",
+        deepseekSpent: "已花",
+        alertLowBalanceTitle: "DeepSeek 余额不足",
+        alertLowBalanceBody: { amount, runout in runout.map { "剩余 \(amount)，按当前速度约 \($0) 用完。" } ?? "剩余 \(amount)。" },
+
         launchAtLogin: "登录时启动",
         notifications: "通知",
         notifyOverPace: "窗口超速时",
@@ -283,6 +361,7 @@ struct Strings {
         general: "通用",
         claudeCode: "Claude Code",
         menuBarShows: "菜单栏显示窗口",
+        menuBarProvider: "菜单栏显示",
         compactMenuBar: "精简菜单栏",
         compactMenuBarHint: "只显示百分比（\"42%\"），不显示 \"5h 42% ▲9\"。菜单栏拥挤时使用。",
         language: "语言",

@@ -43,6 +43,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         return URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)")
     }
 
+    func deliverLowBalance(amount: String, runout: Date?, strings: Strings, locale: Locale) {
+        guard isSupported else { return }
+        let content = UNMutableNotificationContent()
+        content.title = strings.alertLowBalanceTitle
+        let when = runout.map { $0.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(locale)) }
+        content.body = strings.alertLowBalanceBody(amount, when)
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "deepseek-low-balance", content: content, trigger: nil))
+    }
+
     /// Asks for permission the first time a notification kind is enabled. Returns whether granted.
     func requestAuthorization() async -> Bool {
         guard isSupported else { return false }
@@ -56,11 +66,19 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
+    private func windowName(for id: String, strings: Strings) -> String {
+        if let kind = WindowKind(rawValue: String(id.dropFirst("claude.".count))), id.hasPrefix("claude.") {
+            return strings.windowTitle(kind)
+        }
+        if id == "deepseek.month" { return strings.deepseekBudgetTitle }
+        return id
+    }
+
     func deliver(_ alert: UsageAlert, strings: Strings, locale: Locale) {
         guard isSupported else { return }
         let content = UNMutableNotificationContent()
         let clock = Date.FormatStyle.dateTime.hour().minute().locale(locale)
-        let windowName = strings.windowTitle(alert.window)
+        let windowName = windowName(for: alert.windowID, strings: strings)
         let resetTime = alert.resetsAt.formatted(clock)
         switch alert.kind {
         case .overPace:
@@ -80,7 +98,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         }
         content.sound = .default
         // Identifier per condition and window instance, so a duplicate replaces rather than stacks.
-        let id = "\(alert.kind.rawValue)-\(alert.window.rawValue)-\(Int(alert.resetsAt.timeIntervalSince1970))"
+        let id = "\(alert.kind.rawValue)-\(alert.windowID)-\(Int(alert.resetsAt.timeIntervalSince1970))"
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 }

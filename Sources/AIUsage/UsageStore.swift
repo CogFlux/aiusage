@@ -22,6 +22,12 @@ final class UsageStore: ObservableObject {
         static let notifyOverPace = "notifyOverPace"
         static let notifyRunningOut = "notifyRunningOut"
         static let notifyWindowReset = "notifyWindowReset"
+        static let menuBarProvider = "menuBarProvider"
+    }
+
+    enum MenuBarProvider: String, CaseIterable {
+        case claude
+        case deepseek
     }
 
     @Published private(set) var snapshot: UsageSnapshot?
@@ -86,7 +92,10 @@ final class UsageStore: ObservableObject {
     }
     var loginItemSupported: Bool { LoginItem.isSupported }
 
-    private let notifier = Notifier()
+    let notifier: Notifier
+    @Published var menuBarProvider: MenuBarProvider {
+        didSet { UserDefaults.standard.set(menuBarProvider.rawValue, forKey: Keys.menuBarProvider) }
+    }
     var notificationsSupported: Bool { notifier.isSupported }
     private var alertTracker = AlertTracker()
 
@@ -100,8 +109,10 @@ final class UsageStore: ObservableObject {
     private var watcher: DirectoryWatcher?
     private var ticker: Timer?
 
-    init() {
+    init(notifier: Notifier) {
+        self.notifier = notifier
         let defaults = UserDefaults.standard
+        menuBarProvider = MenuBarProvider(rawValue: defaults.string(forKey: Keys.menuBarProvider) ?? "") ?? .claude
         claudePathOverride = defaults.string(forKey: Keys.claudePath) ?? ""
         menuBarKind = WindowKind(rawValue: defaults.string(forKey: Keys.menuBarKind) ?? "") ?? .fiveHour
         let storedLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
@@ -166,7 +177,7 @@ final class UsageStore: ObservableObject {
             let window = UsageWindow(kind: menuBarKind, usedPercent: 42, resetsAt: resets)
             let pace = Pace(usedPercent: 42, elapsedFraction: 0.33, budgetPercent: 33, deltaPercent: 9,
                             projectedPercent: 126, runoutAt: nil, status: .overPace)
-            notifier.deliver(UsageAlert(kind: .overPace, window: window.kind, resetsAt: resets, pace: pace),
+            notifier.deliver(UsageAlert(kind: .overPace, windowID: "claude.\(window.kind.rawValue)", resetsAt: resets, pace: pace),
                              strings: strings, locale: locale)
         }
     }
@@ -180,7 +191,7 @@ final class UsageStore: ObservableObject {
             switch alert.kind {
             case .overPace: enabled = notifyOverPace
             case .runningOut: enabled = notifyRunningOut
-            case .windowReset: enabled = notifyWindowReset && alert.window == .fiveHour
+            case .windowReset: enabled = notifyWindowReset && alert.claudeWindow == .fiveHour
             }
             if enabled {
                 notifier.deliver(alert, strings: strings, locale: locale)

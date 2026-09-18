@@ -56,16 +56,52 @@ public struct Pace: Equatable, Sendable {
     }
 }
 
+/// Anything that can be paced: a Claude rate-limit window, a monthly spend budget, and so on.
+/// `usedPercent` is progress toward the thing that resets at `resetsAt`, on a 0...100 scale.
+public struct PaceWindow: Equatable, Sendable {
+    /// Stable identity, e.g. "claude.five_hour" or "deepseek.month". Alerts dedupe on it.
+    public var id: String
+    public var usedPercent: Double
+    public var startsAt: Date
+    public var resetsAt: Date
+    /// |delta| within this band counts as on track.
+    public var tolerance: Double
+    /// How close `runoutAt` must be before a running-out alert fires.
+    public var runningOutLead: TimeInterval
+
+    public init(id: String, usedPercent: Double, startsAt: Date, resetsAt: Date,
+                tolerance: Double, runningOutLead: TimeInterval) {
+        self.id = id
+        self.usedPercent = usedPercent
+        self.startsAt = startsAt
+        self.resetsAt = resetsAt
+        self.tolerance = tolerance
+        self.runningOutLead = runningOutLead
+    }
+
+    public static func claude(_ window: UsageWindow, config: PaceConfig = PaceConfig(),
+                              alerts: AlertConfig = AlertConfig()) -> PaceWindow {
+        PaceWindow(id: "claude.\(window.kind.rawValue)", usedPercent: window.usedPercent,
+                   startsAt: window.startsAt, resetsAt: window.resetsAt,
+                   tolerance: config.tolerance(for: window.kind),
+                   runningOutLead: alerts.runningOutLead[window.kind] ?? 30 * 60)
+    }
+}
+
 public enum PaceCalculator {
     public static func compute(window: UsageWindow, now: Date, config: PaceConfig = PaceConfig()) -> Pace {
+        compute(PaceWindow.claude(window, config: config), now: now, config: config)
+    }
+
+    public static func compute(_ window: PaceWindow, now: Date, config: PaceConfig = PaceConfig()) -> Pace {
         if now >= window.resetsAt {
             return Pace(usedPercent: 0, elapsedFraction: 0, budgetPercent: 0, deltaPercent: 0,
                         projectedPercent: nil, runoutAt: nil, status: .reset)
         }
 
-        let duration = window.kind.duration
+        let duration = window.resetsAt.timeIntervalSince(window.startsAt)
         let elapsedSeconds = max(0, now.timeIntervalSince(window.startsAt))
-        let elapsed = min(1, elapsedSeconds / duration)
+        let elapsed = duration > 0 ? min(1, elapsedSeconds / duration) : 1
         let budget = config.targetPercent * elapsed
         let delta = window.usedPercent - budget
         let tooEarly = elapsed < config.minElapsedFraction || elapsedSeconds < config.minElapsedSeconds
@@ -82,13 +118,12 @@ public enum PaceCalculator {
             }
         }
 
-        let tolerance = config.tolerance(for: window.kind)
         let status: PaceStatus
         if tooEarly {
             status = .tooEarly
-        } else if delta > tolerance {
+        } else if delta > window.tolerance {
             status = .overPace
-        } else if delta < -tolerance {
+        } else if delta < -window.tolerance {
             status = .underPace
         } else {
             status = .onTrack

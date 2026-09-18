@@ -2,7 +2,7 @@
 
 [English](README.md) · 中文
 
-macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口）以及 **pace**：按"窗口结束时恰好用到 99%"
+macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可选加上 DeepSeek 余额与燃烧率，以及 **pace**：按"窗口结束时恰好用到 99%"
 的均速折算，现在应该用到多少、实际用了多少、超了还是省了、照这个速度什么时候用完。
 
 ```
@@ -38,6 +38,12 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口）以及 *
 - **通用**：语言、菜单栏显示哪个窗口（5h / 7d）、精简菜单栏（只显示 `42%`）、登录时启动、
   通知（超速 / 重置前用尽 / 5 小时窗口重置，附测试按钮）、更新检查。
 - **Claude Code**：钩子状态与安装、是否让钩子同时在 Claude Code 自己的状态栏打印一行用量（仅在你原本没有状态栏时；下次刷新生效，无需重启）、`claude` 路径。
+
+## DeepSeek
+
+设置 → DeepSeek。填入 API key 后，App 每 5 分钟查询一次免费的余额接口，从余额变化推算今日 / 本月花费和每天燃烧率，
+并估算余额用尽日期。设置月预算后，本月会像 Claude 窗口一样做 pace（标记、通知、菜单栏 `DS 42% ▲6`）。
+key 以仅本用户可读的权限保存在 `~/Library/Application Support/AIUsage/`，只会发送到 `api.deepseek.com/user/balance`。
 
 ## 语言
 
@@ -93,5 +99,6 @@ MIT，见 [LICENSE](LICENSE)。
 - [x] Claude：statusline 被动 + `claude -p` 主动
 - [x] 应用内更新（Sparkle）
 - [ ] 菜单栏同时显示 5h 和 7d
-- [ ] 其他 provider（Codex / Cursor …）——只需产出同样的 `UsageSnapshot`
+- [x] DeepSeek 余额、燃烧率与月预算 pace
+- [ ] 其他 provider（Codex / Cursor …）
 - [x] 开机自启、通知（超速 / 即将用尽 / 窗口重置）

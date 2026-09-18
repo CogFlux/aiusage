@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuContentView: View {
     @EnvironmentObject var store: UsageStore
+    @EnvironmentObject var deepseek: DeepSeekStore
 
     private var s: Strings { store.strings }
 
@@ -26,6 +27,10 @@ struct MenuContentView: View {
             }
             Divider()
             probeSection
+            if deepseek.enabled {
+                Divider()
+                DeepSeekSection()
+            }
             if !store.hookInstalled, store.claudeCodeInstalled {
                 Divider()
                 hookPrompt
@@ -35,6 +40,7 @@ struct MenuContentView: View {
         }
         .padding(14)
         .frame(width: 360)
+        .onAppear { deepseek.tick() }
     }
 
     private var header: some View {

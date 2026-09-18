@@ -102,6 +102,31 @@ exposes it through the statusline.
   Anthropic explicitly disallows third-party tools from using subscription OAuth.
 - claude.ai web endpoints / cookies: violates the consumer terms of service.
 
+### 1.5 DeepSeek (prepaid balance)
+
+DeepSeek's API exposes no usage statistics, only the current balance
+(`GET https://api.deepseek.com/user/balance`, Bearer API key, free, no tokens). The platform's web dashboard
+has daily figures but no public API, and scraping it is out of bounds for the same reason as claude.ai.
+
+So spend is **derived**: the app polls the balance every 5 minutes and feeds a `SpendLedger`:
+
+- A decrease between consecutive observations is spend; an increase is a top-up and never counts as
+  negative spend. Granted credit expiring shows up as spend (known blind spot).
+- Only change points are stored (identical balances collapse), plus the time of the last observation.
+  Samples older than 90 days are pruned, keeping the last pre-cutoff sample as a baseline.
+- Burn rate = spend over the trailing 7 days ÷ the real span of history in that window; withheld until
+  there are 6 hours of history. Run-out = balance ÷ burn rate.
+- Precision is the balance's precision (¥0.01); spend below that is invisible until it accumulates.
+
+The API key lives in `~/Library/Application Support/AIUsage/deepseek.key` with mode 0600 rather than the
+Keychain: the app is ad-hoc signed, and the Keychain identifies an app by its code signature, so every
+update would trigger a "wants to use your confidential information" prompt. Move it to the Keychain once
+builds are Developer-ID signed.
+
+Optional monthly budget: the calendar month becomes a `PaceWindow` (`id: deepseek.month`,
+`usedPercent = spentThisMonth / budget × 100`, tolerance 3, running-out lead 2 days) and goes through the
+same pace and alert code as Claude's windows.
+
 ## 2. Unified model
 
 ```
@@ -112,6 +137,12 @@ UsageWindow  { kind, usedPercent: 0–100, resetsAt: timestamp }
   startsAt   = resetsAt − duration          (Claude only reports the reset time; the start is derived)
 
 UsageSnapshot { provider: "claude", source: statusline | probe, observedAt, windows: [UsageWindow] }
+
+PaceWindow   { id, usedPercent: 0–100, startsAt, resetsAt, tolerance, runningOutLead }
+             — the generic input to PaceCalculator and AlertTracker. Claude windows map onto it
+               ("claude.five_hour", "claude.seven_day"); a DeepSeek monthly budget is "deepseek.month".
+
+SpendLedger  { samples: [{at, balance}], lastObservedAt }  — see §1.5
 ```
 
 Precision: both sources ultimately come from the API's rate-limit response headers, whose utilization is a

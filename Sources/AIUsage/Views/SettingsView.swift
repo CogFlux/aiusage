@@ -3,7 +3,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var store: UsageStore
+    @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var updater: Updater
+    @State private var apiKeyDraft = ""
+    @State private var apiKeyJustSaved = false
 
     private var s: Strings { store.strings }
 
@@ -13,6 +16,8 @@ struct SettingsView: View {
                 .tabItem { Label(s.general, systemImage: "gearshape") }
             claudeCodeTab
                 .tabItem { Label(s.claudeCode, systemImage: "terminal") }
+            deepseekTab
+                .tabItem { Label("DeepSeek", systemImage: "creditcard") }
         }
         .frame(width: 460)
         .padding(.bottom, 4)
@@ -28,6 +33,14 @@ struct SettingsView: View {
             } label: {
                 Text(s.language)
                 Text(s.languageRelaunchHint)
+            }
+
+            if deepseek.enabled {
+                Picker(s.menuBarProvider, selection: $store.menuBarProvider) {
+                    Text("Claude").tag(UsageStore.MenuBarProvider.claude)
+                    Text("DeepSeek").tag(UsageStore.MenuBarProvider.deepseek)
+                }
+                .pickerStyle(.segmented)
             }
 
             Picker(s.menuBarShows, selection: $store.menuBarKind) {
@@ -81,6 +94,60 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var deepseekTab: some View {
+        Form {
+            Section {
+                Toggle(isOn: $deepseek.enabled) {
+                    Text(s.deepseekEnable)
+                    Text(s.deepseekEnableHint)
+                }
+            }
+
+            Section {
+                HStack {
+                    SecureField(s.deepseekAPIKey, text: $apiKeyDraft,
+                                prompt: Text(deepseek.hasAPIKey ? "••••••••" : "sk-…"))
+                        .onSubmit(saveKey)
+                    Button(s.deepseekSave, action: saveKey).disabled(apiKeyDraft.isEmpty)
+                }
+                HStack {
+                    Text(apiKeyJustSaved ? s.deepseekAPIKeySaved : s.deepseekAPIKeyHint)
+                        .font(.caption).foregroundStyle(apiKeyJustSaved ? .green : .secondary)
+                    Spacer()
+                    Button(s.deepseekRefresh) { deepseek.refresh() }
+                        .disabled(!deepseek.hasAPIKey || deepseek.isRefreshing)
+                }
+                if let error = deepseek.lastError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                } else if let latest = deepseek.latest {
+                    Text("\(s.deepseekBalance): \(deepseek.money(latest.total))").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                TextField(s.deepseekMonthlyBudget, value: $deepseek.monthlyBudget, format: .number)
+                Text(s.deepseekMonthlyBudgetHint).font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                TextField(s.deepseekLowBalance, value: $deepseek.lowBalanceThreshold, format: .number)
+                Toggle(s.deepseekNotifyLowBalance, isOn: $deepseek.notifyLowBalance)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func saveKey() {
+        guard !apiKeyDraft.isEmpty else { return }
+        deepseek.saveAPIKey(apiKeyDraft)
+        apiKeyDraft = ""
+        apiKeyJustSaved = true
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            apiKeyJustSaved = false
+        }
     }
 
     private var claudeCodeTab: some View {

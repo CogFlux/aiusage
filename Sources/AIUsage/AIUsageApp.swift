@@ -3,7 +3,8 @@ import SwiftUI
 
 @main
 struct AIUsageApp: App {
-    @StateObject private var store = UsageStore()
+    @StateObject private var store: UsageStore
+    @StateObject private var deepseek: DeepSeekStore
     @StateObject private var updater = Updater()
 
     init() {
@@ -15,6 +16,20 @@ struct AIUsageApp: App {
         // No Dock icon. The .app also sets LSUIElement, but this makes the bare
         // `swift run` binary behave the same way.
         NSApplication.shared.setActivationPolicy(.accessory)
+
+        let notifier = Notifier()
+        let store = UsageStore(notifier: notifier)
+        _store = StateObject(wrappedValue: store)
+        _deepseek = StateObject(wrappedValue: DeepSeekStore(notifier: notifier,
+                                                            strings: { store.strings },
+                                                            locale: { store.locale }))
+    }
+
+    private var menuBarTitle: String {
+        switch store.menuBarProvider {
+        case .claude: return store.menuBarTitle
+        case .deepseek: return deepseek.enabled ? deepseek.menuBarTitle(compact: store.compactMenuBar) : store.menuBarTitle
+        }
     }
 
     private static func runProbeAndExit() -> Never {
@@ -55,9 +70,10 @@ struct AIUsageApp: App {
         MenuBarExtra {
             MenuContentView()
                 .environmentObject(store)
+                .environmentObject(deepseek)
                 .environmentObject(updater)
         } label: {
-            Text(store.menuBarTitle)
+            Text(menuBarTitle)
                 .monospacedDigit()
         }
         .menuBarExtraStyle(.window)
@@ -65,6 +81,7 @@ struct AIUsageApp: App {
         Settings {
             SettingsView()
                 .environmentObject(store)
+                .environmentObject(deepseek)
                 .environmentObject(updater)
         }
     }
