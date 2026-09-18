@@ -141,7 +141,7 @@ Parameters (`PaceConfig`, defaults):
 | `targetPercent` | 99 | The usage level planned for the moment the window resets |
 | `minElapsedFraction` | 0.05 | No projection below this window progress |
 | `minElapsedSeconds` | 900 | No projection below this elapsed time |
-| `onTrackTolerance` | 5 | |delta| within this counts as on track |
+| `onTrackTolerance` | 5h: 5, 7d: 3 | Per window. |delta| within this counts as on track. The 5-hour window moves in bursts and needs slack; the 7-day window is smooth and a 5-point miss there is a day's quota |
 
 Algorithm (`now` is the current time):
 
@@ -163,6 +163,7 @@ if not tooEarly and elapsed > 0:
 else:
     projected = runout = nil
 
+tolerance = onTrackTolerance[kind]                     # 5 for five_hour, 3 for seven_day
 status = tooEarly            ? tooEarly
        : delta >  tolerance  ? overPace
        : delta < −tolerance  ? underPace

@@ -6,8 +6,14 @@ public struct PaceConfig: Equatable, Sendable {
     /// Below either threshold the projection is meaningless (divides by ~0), so it is withheld.
     public var minElapsedFraction: Double = 0.05
     public var minElapsedSeconds: TimeInterval = 15 * 60
-    /// |delta| within this band counts as on track.
-    public var onTrackTolerance: Double = 5
+    /// |delta| within this band counts as on track. Per window: the 5-hour window moves in
+    /// bursts and needs slack; the 7-day window is smooth, and a 5-point miss there is a
+    /// day's worth of quota, so it gets a tighter band.
+    public var onTrackTolerance: [WindowKind: Double] = [.fiveHour: 5, .sevenDay: 3]
+
+    public func tolerance(for kind: WindowKind) -> Double {
+        onTrackTolerance[kind] ?? 5
+    }
 
     public init() {}
 }
@@ -76,12 +82,13 @@ public enum PaceCalculator {
             }
         }
 
+        let tolerance = config.tolerance(for: window.kind)
         let status: PaceStatus
         if tooEarly {
             status = .tooEarly
-        } else if delta > config.onTrackTolerance {
+        } else if delta > tolerance {
             status = .overPace
-        } else if delta < -config.onTrackTolerance {
+        } else if delta < -tolerance {
             status = .underPace
         } else {
             status = .onTrack

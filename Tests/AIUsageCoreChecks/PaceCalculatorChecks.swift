@@ -16,6 +16,7 @@ enum PaceCalculatorChecks {
         onTrackWithinTolerance()
         tooEarlyWithholdsProjection()
         tooEarlyByFractionForSevenDayWindow()
+        sevenDayUsesTighterTolerance()
         resetWhenPastResetsAt()
         alreadyExhaustedRunoutIsInThePast()
         customTarget()
@@ -58,6 +59,17 @@ enum PaceCalculatorChecks {
         // 5% of 7d is 8.4h; 3h in is past the 15-min floor but under the fraction floor.
         let pace = PaceCalculator.compute(window: window(1, kind: .sevenDay), now: Date(timeIntervalSince1970: 3 * 3600))
         Harness.equal(pace.status, .tooEarly, "7d window 3h in is too early")
+    }
+
+    static func sevenDayUsesTighterTolerance() {
+        // Halfway through 7d: budget 49.5. +4 is on track for 5h (±5) but over pace for 7d (±3).
+        let half = Date(timeIntervalSince1970: 3.5 * 86400)
+        let seven = PaceCalculator.compute(window: window(53.5, kind: .sevenDay), now: half)
+        Harness.equal(seven.status, .overPace, "7d: +4 exceeds ±3")
+        let five = PaceCalculator.compute(window: window(53.5), now: Date(timeIntervalSince1970: 2.5 * 3600))
+        Harness.equal(five.status, .onTrack, "5h: +4 within ±5")
+        let sevenUnder = PaceCalculator.compute(window: window(46, kind: .sevenDay), now: half)
+        Harness.equal(sevenUnder.status, .underPace, "7d: -3.5 is under pace")
     }
 
     static func resetWhenPastResetsAt() {
