@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct AIUsageApp: App {
     @StateObject private var store = UsageStore()
+    @StateObject private var updater = Updater()
 
     init() {
         // Debug entry point: `AIUsage --probe` runs one active query, prints the
@@ -54,6 +55,7 @@ struct AIUsageApp: App {
         MenuBarExtra {
             MenuContentView()
                 .environmentObject(store)
+                .environmentObject(updater)
         } label: {
             Text(store.menuBarTitle)
                 .monospacedDigit()
@@ -63,6 +65,7 @@ struct AIUsageApp: App {
         Settings {
             SettingsView()
                 .environmentObject(store)
+                .environmentObject(updater)
         }
     }
 }

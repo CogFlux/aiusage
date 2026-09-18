@@ -26,6 +26,11 @@ Details in [docs/data-contract.md](docs/data-contract.md).
 
 Side effect of Query now: if no 5-hour window is currently active, the request starts a new one.
 
+## Updates
+
+Packaged releases check for updates through [Sparkle](https://sparkle-project.org) (EdDSA-signed appcast at
+`aiusage.cogflux.io/appcast.xml`). Toggle automatic checks or check manually in Settings → General.
+
 ## Settings
 
 Gear icon in the menu → Settings window.
@@ -87,6 +92,7 @@ MIT — see [LICENSE](LICENSE).
 ## Roadmap
 
 - [x] Claude: passive statusline + active `claude -p`
+- [x] In-app updates (Sparkle)
 - [ ] Show 5h and 7d side by side in the menu bar
 - [ ] Other providers (Codex / Cursor …) — anything that produces a `UsageSnapshot`
 - [ ] Launch at login, notifications (over pace / about to run out)

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var store: UsageStore
+    @EnvironmentObject var updater: Updater
 
     private var s: Strings { store.strings }
 
@@ -35,6 +36,19 @@ struct SettingsView: View {
             Toggle(isOn: $store.compactMenuBar) {
                 Text(s.compactMenuBar)
                 Text(s.compactMenuBarHint)
+            }
+
+            Section(s.updates) {
+                if updater.available {
+                    Toggle(s.autoCheckForUpdates, isOn: $updater.automaticallyChecks)
+                    HStack {
+                        Spacer()
+                        Button(s.checkForUpdates) { updater.checkForUpdates() }
+                            .disabled(!updater.canCheck)
+                    }
+                } else {
+                    Text(s.updatesUnavailable).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -72,6 +86,10 @@ struct SettingsView: View {
                 TextField(s.claudePath, text: $store.claudePathOverride,
                           prompt: Text(store.resolvedClaudePath ?? s.claudePathPlaceholder))
                     .font(.callout.monospaced())
+            }
+
+            Section {
+                Text(s.precisionNote).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

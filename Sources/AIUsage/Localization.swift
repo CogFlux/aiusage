@@ -59,6 +59,7 @@ struct Strings {
     let claudeCodeMissingBody: String
     let installClaudeCode: String
     let noQuotaInData: String
+    let precisionNote: String
 
     // Probe
     let probeNow: String
@@ -78,6 +79,12 @@ struct Strings {
     let hookHint: String
     let hookResourceMissing: String
     let hookSettingsNotObject: String
+
+    // Updates
+    let updates: String
+    let checkForUpdates: String
+    let autoCheckForUpdates: String
+    let updatesUnavailable: String
 
     // Settings
     let settings: String
@@ -133,6 +140,7 @@ struct Strings {
         claudeCodeMissingBody: "AIUsage reads your quota through Claude Code, which is not installed on this Mac (or is not on your PATH — set its location in Settings → Claude Code).",
         installClaudeCode: "Install Claude Code",
         noQuotaInData: "Claude Code is running but reports no subscription quota. Rate limits only exist for Claude Pro and Max accounts; API-key accounts have nothing to show.",
+        precisionNote: "Percentages come from Claude's rate-limit headers, which report whole points rounded down. Claude Code's /usage screen may read up to one point higher.",
 
         probeNow: "Query now",
         probeHint: "Sends one tiny Haiku request (~500 tokens, ≈ $0.001 API-equivalent). Included in a Max subscription; uses a negligible slice of quota. If no window is active, this starts a new 5-hour window.",
@@ -150,6 +158,11 @@ struct Strings {
         hookHint: "The hook mirrors the JSON Claude Code feeds its status line into a local file that this app watches — passive and free. Installing backs up ~/.claude/settings.json and keeps your existing status line command running.",
         hookResourceMissing: "aiusage-statusline.sh is missing from the app bundle",
         hookSettingsNotObject: "~/.claude/settings.json is not a JSON object",
+
+        updates: "Updates",
+        checkForUpdates: "Check for Updates…",
+        autoCheckForUpdates: "Check for updates automatically",
+        updatesUnavailable: "Update checks are only available in packaged release builds.",
 
         settings: "Settings",
         general: "General",
@@ -188,6 +201,7 @@ struct Strings {
         claudeCodeMissingBody: "AIUsage 通过 Claude Code 读取额度，但这台 Mac 上没有安装它（或它不在 PATH 里——可在 设置 → Claude Code 指定位置）。",
         installClaudeCode: "安装 Claude Code",
         noQuotaInData: "Claude Code 在运行，但没有上报订阅额度。只有 Claude Pro / Max 账户才有速率限制窗口；API key 账户没有可显示的内容。",
+        precisionNote: "百分比来自 Claude 的速率限制响应头，只有整数精度且向下取整；Claude Code 的 /usage 可能比这里高 1 个点。",
 
         probeNow: "立即查询",
         probeHint: "发送一次极小的 Haiku 请求（约 500 tokens，≈ $0.001 API 等价）。Max 套餐内不另收费，只消耗极少量额度；若当前没有活跃窗口，会启动一个新的 5 小时窗口。",
@@ -205,6 +219,11 @@ struct Strings {
         hookHint: "钩子把 Claude Code 喂给状态栏的 JSON 镜像到本地文件，App 被动读取，零成本。安装前会备份 ~/.claude/settings.json，原有的状态栏命令会被保留并继续执行。",
         hookResourceMissing: "App 包里缺少 aiusage-statusline.sh",
         hookSettingsNotObject: "~/.claude/settings.json 不是 JSON 对象",
+
+        updates: "更新",
+        checkForUpdates: "检查更新…",
+        autoCheckForUpdates: "自动检查更新",
+        updatesUnavailable: "只有打包的正式版才能检查更新。",
 
         settings: "设置",
         general: "通用",

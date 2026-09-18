@@ -9,6 +9,11 @@ cd "$(dirname "$0")/.."
 
 VERSION="${VERSION:-0.1.0}"
 BUNDLE_ID="${BUNDLE_ID:-io.cogflux.aiusage}"
+# Sparkle: feed URL and the EdDSA public key (sparkle-public-key.txt, committed; the private
+# key stays in the release maintainer's Keychain). Without the key file the updater is off.
+SU_FEED_URL="${SU_FEED_URL:-https://aiusage.cogflux.io/appcast.xml}"
+SU_PUBLIC_KEY="${SU_PUBLIC_KEY:-$(cat sparkle-public-key.txt 2>/dev/null || true)}"
+SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 
 if [ "${1:-}" = "--universal" ]; then
   swift build -c release --triple arm64-apple-macosx14.0
@@ -27,10 +32,19 @@ fi
 
 APP="build/AIUsage.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN" "$APP/Contents/MacOS/AIUsage"
 # SwiftPM's Bundle.module accessor looks in Contents/Resources for this bundle.
 cp -R "$RES" "$APP/Contents/Resources/"
+# The binary links Sparkle via @rpath/../Frameworks (see Package.swift linkerSettings).
+cp -R "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/"
+
+SPARKLE_PLIST=""
+if [ -n "$SU_PUBLIC_KEY" ]; then
+  SPARKLE_PLIST="  <key>SUFeedURL</key><string>${SU_FEED_URL}</string>
+  <key>SUPublicEDKey</key><string>${SU_PUBLIC_KEY}</string>
+  <key>SUEnableInstallerLauncherService</key><false/>"
+fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -48,11 +62,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+${SPARKLE_PLIST}
 </dict>
 </plist>
 PLIST
 
-# Ad-hoc signature so macOS runs it locally; replace with a Developer ID for distribution.
+# Ad-hoc signatures so macOS runs it locally; replace with a Developer ID for distribution.
+# Sparkle's helpers inside the framework must be signed before the app that embeds them.
+codesign --force --deep --sign - "$APP/Contents/Frameworks/Sparkle.framework" 2>/dev/null
 codesign --force --sign - "$APP" >/dev/null
 rm -f build/AIUsage-universal
-echo "built $APP ($(lipo -archs "$APP/Contents/MacOS/AIUsage"))"
+echo "built $APP ($(lipo -archs "$APP/Contents/MacOS/AIUsage"); updater $([ -n "$SU_PUBLIC_KEY" ] && echo on || echo off))"

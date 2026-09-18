@@ -24,6 +24,11 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口）以及 *
 
 主动查询的副作用：如果当前没有活跃的 5h 窗口，它会开启一个新窗口。
 
+## 更新
+
+打包发布的版本通过 [Sparkle](https://sparkle-project.org) 检查更新（EdDSA 签名的 appcast 位于
+`aiusage.cogflux.io/appcast.xml`）。在 设置 → 通用 里可开关自动检查或手动检查。
+
 ## 设置
 
 菜单里的齿轮 → 设置窗口。
@@ -83,6 +88,7 @@ MIT，见 [LICENSE](LICENSE)。
 ## 路线
 
 - [x] Claude：statusline 被动 + `claude -p` 主动
+- [x] 应用内更新（Sparkle）
 - [ ] 菜单栏同时显示 5h 和 7d
 - [ ] 其他 provider（Codex / Cursor …）——只需产出同样的 `UsageSnapshot`
 - [ ] 开机自启、通知（超速 / 即将用尽）

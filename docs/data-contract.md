@@ -105,6 +105,11 @@ UsageWindow  { kind, usedPercent: 0–100, resetsAt: timestamp }
 UsageSnapshot { provider: "claude", source: statusline | probe, observedAt, windows: [UsageWindow] }
 ```
 
+Precision: both sources ultimately come from the API's rate-limit response headers, whose utilization is a
+two-decimal fraction that appears to be **truncated** (0.186 → 0.18). Claude Code's `/usage` screen uses a
+more precise internal value and rounds, so it can read up to one point higher than AIUsage. This is a
+property of the source, not a bug; do not "correct" for it.
+
 Merge rule (`UsageSnapshot.merging`), applied whenever a new observation arrives from either source:
 
 1. An observation older than the current snapshot is ignored entirely.
