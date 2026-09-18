@@ -20,7 +20,7 @@ enum UsageFormatterChecks {
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.overPace, delta: 9.4), stale: false), "5h 42% ▲9", "over pace")
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.underPace, delta: -3), stale: false), "5h 42% ▼3", "under pace")
         Harness.equal(UsageFormatter.menuBarTitle(kind: .sevenDay, pace: pace(.onTrack), stale: false), "7d 42% ●", "on track")
-        Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.tooEarly, used: 3), stale: false), "5h 3%", "too early")
+        Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.tooEarly, used: 3), stale: false), "5h 3% ○", "too early")
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.reset, used: 0), stale: false), "5h 0% ↺", "reset")
         Harness.equal(UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace(.onTrack), stale: true), "5h 42% ● ⧗", "stale marker")
     }

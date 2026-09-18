@@ -183,7 +183,7 @@ status = tooEarly            ? tooEarly
 | no data | `—` | `5h —` |
 | idle (window absent after its reset; next message starts a new one) | `↺` | `5h ↺` |
 | reset (window still listed but `now ≥ resetsAt`) | `0% ↺` | `5h 0% ↺` |
-| tooEarly | `<used>%` | `5h 3%` |
+| tooEarly | `<used>% ○` | `5h 3% ○` |
 | overPace | `<used>% ▲<|delta|>` | `5h 42% ▲9` |
 | underPace | `<used>% ▼<|delta|>` | `5h 42% ▼3` |
 | onTrack | `<used>% ●` | `5h 42% ●` |

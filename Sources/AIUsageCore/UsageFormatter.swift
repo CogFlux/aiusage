@@ -3,7 +3,7 @@ import Foundation
 /// Text rendering shared by the menu bar title and the dropdown. Kept in Core so it is testable
 /// and so a port can reproduce the exact same strings.
 public enum UsageFormatter {
-    /// Title for the menu bar, e.g. "5h 42% ▲9", "5h 42% ▼3", "5h 42% ●", "5h 0% ↺", "5h —".
+    /// Title for the menu bar, e.g. "5h 42% ▲9", "5h 42% ▼3", "5h 42% ●", "5h 1% ○", "5h 0% ↺", "5h —".
     /// `compact` reduces it to the bare percentage ("42%", "—") for crowded menu bars.
     /// `idle` marks "no active window right now" (Claude drops a window after its reset until the
     /// next message starts a new one), shown as "5h ↺" rather than the no-data dash.
@@ -18,7 +18,8 @@ public enum UsageFormatter {
         case .reset:
             s += "0% ↺"
         case .tooEarly:
-            s += percent(pace.usedPercent)
+            // Hollow marker: too early in the window to judge pace.
+            s += percent(pace.usedPercent) + " ○"
         case .overPace:
             s += percent(pace.usedPercent) + " ▲" + magnitude(pace.deltaPercent)
         case .underPace:

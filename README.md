@@ -9,6 +9,7 @@ how much actually is, whether you are ahead or behind, and when you would run ou
 ```
 5h 42% ▲9      ← 42% used, 9 points above the even-pace budget (red)
 5h 42% ▼3      ← 3 points under budget (green)
+5h 1% ○        ← window just started; too early to judge pace
 5h 42% ●       ← within tolerance of budget (±5 for 5h, ±3 for 7d)
 5h 0% ↺        ← window has reset, waiting for fresh data
 5h ↺           ← no active window; your next message starts one
