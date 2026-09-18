@@ -87,7 +87,16 @@ Notes:
   and inject it into the child process environment explicitly.
 - Remove `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` from the environment, or a nested launch may be refused.
 
-### 1.3 Sources deliberately not used
+### 1.3 Windows not covered
+
+Claude Code's `/usage` screen also shows a separate weekly quota for Claude Fable on Max plans. Neither
+path here exposes it: the statusline JSON only ever carries `five_hour` and `seven_day`, and a Haiku probe's
+`rate_limit_event` has the same two windows. A probe made **with the Fable model** additionally returns a
+`seven_day_overage_included` window, whose meaning is undocumented and which would cost roughly ten times a
+Haiku probe (~$0.01 API-equivalent per query). Not worth it; the Fable quota is out of scope until Claude Code
+exposes it through the statusline.
+
+### 1.4 Sources deliberately not used
 
 - The OAuth token in the `Claude Code-credentials` Keychain item → `/api/oauth/usage`: undocumented, and
   Anthropic explicitly disallows third-party tools from using subscription OAuth.
