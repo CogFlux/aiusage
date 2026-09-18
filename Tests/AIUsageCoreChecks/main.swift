@@ -1,4 +1,5 @@
 PaceCalculatorChecks.run()
 ParserChecks.run()
 UsageFormatterChecks.run()
+AlertTrackerChecks.run()
 Harness.finish()

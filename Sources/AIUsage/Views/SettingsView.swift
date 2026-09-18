@@ -20,10 +20,13 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Picker(s.language, selection: $store.language) {
+            Picker(selection: $store.language) {
                 Text(s.languageSystem).tag(AppLanguage.system)
                 Text("English").tag(AppLanguage.en)
                 Text("中文").tag(AppLanguage.zh)
+            } label: {
+                Text(s.language)
+                Text(s.languageRelaunchHint)
             }
 
             Picker(s.menuBarShows, selection: $store.menuBarKind) {
@@ -36,6 +39,25 @@ struct SettingsView: View {
             Toggle(isOn: $store.compactMenuBar) {
                 Text(s.compactMenuBar)
                 Text(s.compactMenuBarHint)
+            }
+
+            if store.loginItemSupported {
+                Toggle(s.launchAtLogin, isOn: $store.launchAtLogin)
+            }
+
+            if store.notificationsSupported {
+                Section(s.notifications) {
+                    Toggle(s.notifyOverPace, isOn: $store.notifyOverPace)
+                    Toggle(s.notifyRunningOut, isOn: $store.notifyRunningOut)
+                    Toggle(s.notifyWindowReset, isOn: $store.notifyWindowReset)
+                    HStack {
+                        if store.notificationsDenied {
+                            Text(s.notificationsDenied).font(.caption).foregroundStyle(.red)
+                        }
+                        Spacer()
+                        Button(s.sendTestNotification) { store.sendTestNotification() }
+                    }
+                }
             }
 
             Section(s.updates) {

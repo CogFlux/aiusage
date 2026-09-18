@@ -9,12 +9,18 @@ import Sparkle
 final class Updater: ObservableObject {
     let available: Bool
     @Published private(set) var canCheck = false
+    /// Mirrors `SPUUpdater.automaticallyChecksForUpdates`. Sparkle can change it on its own
+    /// (its first-run permission prompt), so we observe it rather than caching the launch value.
     @Published var automaticallyChecks: Bool {
-        didSet { controller.updater.automaticallyChecksForUpdates = automaticallyChecks }
+        didSet {
+            if controller.updater.automaticallyChecksForUpdates != automaticallyChecks {
+                controller.updater.automaticallyChecksForUpdates = automaticallyChecks
+            }
+        }
     }
 
     private let controller: SPUStandardUpdaterController
-    private var cancellable: AnyCancellable?
+    private var cancellables: Set<AnyCancellable> = []
 
     init() {
         let info = Bundle.main.infoDictionary ?? [:]
@@ -23,9 +29,17 @@ final class Updater: ObservableObject {
         automaticallyChecks = controller.updater.automaticallyChecksForUpdates
         guard available else { return }
         controller.startUpdater()
-        cancellable = controller.updater.publisher(for: \.canCheckForUpdates)
+        controller.updater.publisher(for: \.canCheckForUpdates)
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.canCheck = $0 }
+            .store(in: &cancellables)
+        controller.updater.publisher(for: \.automaticallyChecksForUpdates)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] value in
+                guard let self, self.automaticallyChecks != value else { return }
+                self.automaticallyChecks = value
+            }
+            .store(in: &cancellables)
     }
 
     func checkForUpdates() {

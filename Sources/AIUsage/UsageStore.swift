@@ -18,6 +18,9 @@ final class UsageStore: ObservableObject {
         static let menuBarKind = "menuBarKind"
         static let language = "language"
         static let compactMenuBar = "compactMenuBar"
+        static let notifyOverPace = "notifyOverPace"
+        static let notifyRunningOut = "notifyRunningOut"
+        static let notifyWindowReset = "notifyWindowReset"
     }
 
     @Published private(set) var snapshot: UsageSnapshot?
@@ -38,8 +41,16 @@ final class UsageStore: ObservableObject {
 
     @Published var language: AppLanguage {
         didSet {
-            UserDefaults.standard.set(language.rawValue, forKey: Keys.language)
+            let defaults = UserDefaults.standard
+            defaults.set(language.rawValue, forKey: Keys.language)
             Strings.current = strings
+            // Our own strings switch immediately; system frameworks (Sparkle's dialogs,
+            // standard alerts) read AppleLanguages at launch, so they follow after a relaunch.
+            switch language {
+            case .system: defaults.removeObject(forKey: "AppleLanguages")
+            case .en: defaults.set(["en"], forKey: "AppleLanguages")
+            case .zh: defaults.set(["zh-Hans"], forKey: "AppleLanguages")
+            }
         }
     }
 
@@ -59,6 +70,25 @@ final class UsageStore: ObservableObject {
         }
     }
 
+    // MARK: Notifications & login item
+
+    @Published var notifyOverPace: Bool { didSet { notificationSettingChanged(notifyOverPace, key: Keys.notifyOverPace) } }
+    @Published var notifyRunningOut: Bool { didSet { notificationSettingChanged(notifyRunningOut, key: Keys.notifyRunningOut) } }
+    @Published var notifyWindowReset: Bool { didSet { notificationSettingChanged(notifyWindowReset, key: Keys.notifyWindowReset) } }
+    @Published private(set) var notificationsDenied = false
+
+    @Published var launchAtLogin: Bool {
+        didSet {
+            guard launchAtLogin != LoginItem.isEnabled else { return }
+            do { try LoginItem.setEnabled(launchAtLogin) } catch { launchAtLogin = LoginItem.isEnabled }
+        }
+    }
+    var loginItemSupported: Bool { LoginItem.isSupported }
+
+    private let notifier = Notifier()
+    var notificationsSupported: Bool { notifier.isSupported }
+    private var alertTracker = AlertTracker()
+
     var strings: Strings { Strings.forLanguage(language.resolved) }
     var locale: Locale { language.resolved.locale }
 
@@ -77,6 +107,10 @@ final class UsageStore: ObservableObject {
         language = storedLanguage
         compactMenuBar = defaults.bool(forKey: Keys.compactMenuBar)
         showInClaudeCode = HookInstaller.showsLineInClaudeCode
+        notifyOverPace = defaults.bool(forKey: Keys.notifyOverPace)
+        notifyRunningOut = defaults.bool(forKey: Keys.notifyRunningOut)
+        notifyWindowReset = defaults.bool(forKey: Keys.notifyWindowReset)
+        launchAtLogin = LoginItem.isEnabled
         Strings.current = Strings.forLanguage(storedLanguage.resolved)
 
         refreshHookState()
@@ -84,7 +118,53 @@ final class UsageStore: ObservableObject {
         startWatching()
 
         ticker = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.now = Date() }
+            Task { @MainActor in self?.tick() }
+        }
+    }
+
+    private func tick() {
+        now = Date()
+        evaluateAlerts()
+    }
+
+    private func notificationSettingChanged(_ enabled: Bool, key: String) {
+        UserDefaults.standard.set(enabled, forKey: key)
+        guard enabled else { return }
+        Task {
+            let granted = await notifier.requestAuthorization()
+            notificationsDenied = !granted && notifier.isSupported
+        }
+    }
+
+    /// Fires a sample over-pace alert for the menu bar window so the user can confirm permissions.
+    func sendTestNotification() {
+        Task {
+            let granted = await notifier.requestAuthorization()
+            notificationsDenied = !granted && notifier.isSupported
+            guard granted else { return }
+            let resets = Date().addingTimeInterval(2 * 3600)
+            let window = UsageWindow(kind: menuBarKind, usedPercent: 42, resetsAt: resets)
+            let pace = Pace(usedPercent: 42, elapsedFraction: 0.33, budgetPercent: 33, deltaPercent: 9,
+                            projectedPercent: 126, runoutAt: nil, status: .overPace)
+            notifier.deliver(UsageAlert(kind: .overPace, window: window.kind, resetsAt: resets, pace: pace),
+                             strings: strings, locale: locale)
+        }
+    }
+
+    /// Runs on every new snapshot and every clock tick. The tracker dedupes; here we only filter
+    /// by the user's toggles and hand the rest to the notifier.
+    private func evaluateAlerts() {
+        let alerts = alertTracker.evaluate(snapshot: snapshot, now: now, paceConfig: config)
+        for alert in alerts {
+            let enabled: Bool
+            switch alert.kind {
+            case .overPace: enabled = notifyOverPace
+            case .runningOut: enabled = notifyRunningOut
+            case .windowReset: enabled = notifyWindowReset && alert.window == .fiveHour
+            }
+            if enabled {
+                notifier.deliver(alert, strings: strings, locale: locale)
+            }
         }
     }
 
@@ -153,6 +233,7 @@ final class UsageStore: ObservableObject {
     private func merge(_ incoming: UsageSnapshot) {
         snapshot = snapshot?.merging(incoming) ?? incoming
         now = Date()
+        evaluateAlerts()
     }
 
     // MARK: Active source (claude -p probe)

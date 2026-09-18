@@ -80,6 +80,21 @@ struct Strings {
     let hookResourceMissing: String
     let hookSettingsNotObject: String
 
+    // Startup & notifications
+    let launchAtLogin: String
+    let notifications: String
+    let notifyOverPace: String
+    let notifyRunningOut: String
+    let notifyWindowReset: String
+    let notificationsDenied: String
+    let sendTestNotification: String
+    let alertOverPaceTitle: (_ window: String) -> String
+    let alertOverPaceBody: (_ used: String, _ delta: String, _ projected: String, _ resetTime: String) -> String
+    let alertRunningOutTitle: (_ window: String) -> String
+    let alertRunningOutBody: (_ runoutTime: String, _ resetTime: String) -> String
+    let alertResetTitle: (_ window: String) -> String
+    let alertResetBody: String
+
     // Updates
     let updates: String
     let checkForUpdates: String
@@ -95,6 +110,7 @@ struct Strings {
     let compactMenuBarHint: String
     let language: String
     let languageSystem: String
+    let languageRelaunchHint: String
     let showInClaudeCode: String
     let showInClaudeCodeHint: String
     let claudePath: String
@@ -159,6 +175,20 @@ struct Strings {
         hookResourceMissing: "aiusage-statusline.sh is missing from the app bundle",
         hookSettingsNotObject: "~/.claude/settings.json is not a JSON object",
 
+        launchAtLogin: "Launch at login",
+        notifications: "Notifications",
+        notifyOverPace: "When a window goes over pace",
+        notifyRunningOut: "When quota will run out before the reset",
+        notifyWindowReset: "When the 5-hour window resets",
+        notificationsDenied: "Notifications are turned off for AIUsage in System Settings → Notifications.",
+        sendTestNotification: "Send test notification",
+        alertOverPaceTitle: { "\($0) over pace" },
+        alertOverPaceBody: { used, delta, projected, reset in "\(used) used, \(delta) vs budget. Heading for \(projected) by the reset at \(reset)." },
+        alertRunningOutTitle: { "\($0) running out" },
+        alertRunningOutBody: { runout, reset in "At the current rate you hit the limit at \(runout), before the reset at \(reset)." },
+        alertResetTitle: { "\($0) reset" },
+        alertResetBody: "Fresh quota is available.",
+
         updates: "Updates",
         checkForUpdates: "Check for Updates…",
         autoCheckForUpdates: "Check for updates automatically",
@@ -172,6 +202,7 @@ struct Strings {
         compactMenuBarHint: "Show only the percentage (\"42%\") instead of \"5h 42% ▲9\". For crowded menu bars.",
         language: "Language",
         languageSystem: "System",
+        languageRelaunchHint: "Update dialogs follow the new language after a relaunch.",
         showInClaudeCode: "Show usage line in Claude Code",
         showInClaudeCodeHint: "Prints \"[Opus] ctx 20% · 5h 19% · 7d 17%\" in Claude Code's status line. Only applies when you had no status line of your own. Changes show up within about a minute — Claude Code re-runs the status line on its next response or its 60-second timer. No restart needed.",
         claudePath: "claude path",
@@ -220,6 +251,20 @@ struct Strings {
         hookResourceMissing: "App 包里缺少 aiusage-statusline.sh",
         hookSettingsNotObject: "~/.claude/settings.json 不是 JSON 对象",
 
+        launchAtLogin: "登录时启动",
+        notifications: "通知",
+        notifyOverPace: "窗口超速时",
+        notifyRunningOut: "额度将在重置前用完时",
+        notifyWindowReset: "5 小时窗口重置时",
+        notificationsDenied: "AIUsage 的通知已在 系统设置 → 通知 中被关闭。",
+        sendTestNotification: "发送测试通知",
+        alertOverPaceTitle: { "\($0)超速" },
+        alertOverPaceBody: { used, delta, projected, reset in "已用 \(used)，比预算 \(delta)。按此速度到 \(reset) 重置时将达 \(projected)。" },
+        alertRunningOutTitle: { "\($0)即将用尽" },
+        alertRunningOutBody: { runout, reset in "按当前速度将在 \(runout) 触顶，早于 \(reset) 的重置。" },
+        alertResetTitle: { "\($0)已重置" },
+        alertResetBody: "额度已刷新。",
+
         updates: "更新",
         checkForUpdates: "检查更新…",
         autoCheckForUpdates: "自动检查更新",
@@ -233,6 +278,7 @@ struct Strings {
         compactMenuBarHint: "只显示百分比（\"42%\"），不显示 \"5h 42% ▲9\"。菜单栏拥挤时使用。",
         language: "语言",
         languageSystem: "跟随系统",
+        languageRelaunchHint: "更新对话框在重新启动后才切换语言。",
         showInClaudeCode: "在 Claude Code 里显示用量行",
         showInClaudeCodeHint: "在 Claude Code 状态栏打印 \"[Opus] ctx 20% · 5h 19% · 7d 17%\"。仅在你原本没有自己的状态栏时生效。切换后约一分钟内生效——Claude Code 在下一条回复或 60 秒定时器到时重跑状态栏。无需重启。",
         claudePath: "claude 路径",
