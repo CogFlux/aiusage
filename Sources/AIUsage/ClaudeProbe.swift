@@ -7,6 +7,7 @@ import Foundation
 enum ClaudeProbe {
     enum ProbeError: LocalizedError {
         case timeout
+        case notLoggedIn
         case exited(Int32, String)
         case noRateLimitEvent
 
@@ -15,6 +16,8 @@ enum ClaudeProbe {
             switch self {
             case .timeout:
                 return strings.probeTimeout
+            case .notLoggedIn:
+                return strings.probeNotLoggedIn
             case let .exited(code, stderr):
                 let tail = stderr.split(separator: "\n").suffix(3).joined(separator: " ")
                 return strings.probeExited(code, tail)
@@ -109,6 +112,8 @@ enum ClaudeProbe {
         let err = Pipe()
         process.standardOutput = out
         process.standardError = err
+        // Without this, claude waits 3 s for piped stdin before proceeding.
+        process.standardInput = FileHandle.nullDevice
         try process.run()
 
         var timedOut = false
@@ -138,6 +143,10 @@ enum ClaudeProbe {
             return snap
         }
         if timedOut { throw ProbeError.timeout }
+        // Claude Code reports a missing login as a synthetic assistant message, not on stderr.
+        if text.contains("\"error\":\"authentication_failed\"") || text.contains("Not logged in") {
+            throw ProbeError.notLoggedIn
+        }
         if process.terminationStatus != 0 {
             throw ProbeError.exited(process.terminationStatus, String(decoding: errData, as: UTF8.self))
         }

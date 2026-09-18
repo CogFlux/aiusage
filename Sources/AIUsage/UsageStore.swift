@@ -25,6 +25,8 @@ final class UsageStore: ObservableObject {
     @Published private(set) var probeState: ProbeState = .idle
     @Published private(set) var hookInstalled = false
     @Published private(set) var hookError: String?
+    /// The statusline file exists and parses, but carries no `rate_limits` — typically an API-key account.
+    @Published private(set) var fileHasNoQuota = false
 
     @Published var claudePathOverride: String {
         didSet { UserDefaults.standard.set(claudePathOverride, forKey: Keys.claudePath) }
@@ -106,15 +108,29 @@ final class UsageStore: ObservableObject {
         ClaudeProbe.resolveClaudePath(override: claudePathOverride)
     }
 
+    /// True when a `claude` executable is reachable (default locations, login-shell PATH, or the override).
+    var claudeCodeInstalled: Bool { resolvedClaudePath != nil }
+
+    static let claudeCodeInstallURL = URL(string: "https://code.claude.com/docs/en/quickstart")!
+
     // MARK: Passive source (statusline file)
 
     func reloadFromFile() {
         let url = HookInstaller.statuslineFileURL
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let mtime = attrs[.modificationDate] as? Date,
-              let data = try? Data(contentsOf: url),
-              let parsed = try? StatuslineParser.parse(data, observedAt: mtime) else { return }
-        merge(parsed)
+              let data = try? Data(contentsOf: url) else { return }
+        do {
+            if let parsed = try StatuslineParser.parse(data, observedAt: mtime) {
+                fileHasNoQuota = false
+                merge(parsed)
+            } else {
+                // Valid statusline JSON without rate_limits.
+                fileHasNoQuota = true
+            }
+        } catch {
+            // Unreadable JSON, e.g. a partially written file; keep what we have.
+        }
     }
 
     private func startWatching() {
@@ -144,7 +160,8 @@ final class UsageStore: ObservableObject {
     func probe() {
         guard probeState != .running else { return }
         guard let path = resolvedClaudePath else {
-            probeState = .failed(strings.probeClaudeNotFound)
+            let overrideSet = !claudePathOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            probeState = .failed(overrideSet ? strings.probeClaudePathInvalid : strings.probeClaudeNotInstalled)
             return
         }
         probeState = .running

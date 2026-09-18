@@ -54,11 +54,19 @@ struct Strings {
     let resetNote: String
     let noData: String
 
+    // Claude Code availability
+    let claudeCodeMissingTitle: String
+    let claudeCodeMissingBody: String
+    let installClaudeCode: String
+    let noQuotaInData: String
+
     // Probe
     let probeNow: String
     let probeHint: String
-    let probeClaudeNotFound: String
+    let probeClaudeNotInstalled: String
+    let probeClaudePathInvalid: String
     let probeTimeout: String
+    let probeNotLoggedIn: String
     let probeExited: (_ code: Int32, _ stderrTail: String) -> String
     let probeNoEvent: String
 
@@ -121,10 +129,17 @@ struct Strings {
         resetNote: "Window has reset; waiting for new data",
         noData: "No data",
 
+        claudeCodeMissingTitle: "Claude Code not found",
+        claudeCodeMissingBody: "AIUsage reads your quota through Claude Code, which is not installed on this Mac (or is not on your PATH — set its location in Settings → Claude Code).",
+        installClaudeCode: "Install Claude Code",
+        noQuotaInData: "Claude Code is running but reports no subscription quota. Rate limits only exist for Claude Pro and Max accounts; API-key accounts have nothing to show.",
+
         probeNow: "Query now",
         probeHint: "Sends one tiny Haiku request (~500 tokens, ≈ $0.001 API-equivalent). Included in a Max subscription; uses a negligible slice of quota. If no window is active, this starts a new 5-hour window.",
-        probeClaudeNotFound: "claude command not found — set its path below",
+        probeClaudeNotInstalled: "Claude Code is not installed, or not on your PATH. Install it, or set its location in Settings → Claude Code.",
+        probeClaudePathInvalid: "The claude path in Settings does not point to an executable.",
         probeTimeout: "Query timed out (60s)",
+        probeNotLoggedIn: "Claude Code is installed but not signed in. Open Terminal, run `claude`, and sign in with your Claude Pro or Max account.",
         probeExited: { code, tail in "claude exited with code \(code)" + (tail.isEmpty ? "" : ": \(tail)") },
         probeNoEvent: "No rate_limit_event in output (API-key accounts have no subscription quota)",
 
@@ -169,10 +184,17 @@ struct Strings {
         resetNote: "窗口已重置，等待下一次数据",
         noData: "暂无数据",
 
+        claudeCodeMissingTitle: "未找到 Claude Code",
+        claudeCodeMissingBody: "AIUsage 通过 Claude Code 读取额度，但这台 Mac 上没有安装它（或它不在 PATH 里——可在 设置 → Claude Code 指定位置）。",
+        installClaudeCode: "安装 Claude Code",
+        noQuotaInData: "Claude Code 在运行，但没有上报订阅额度。只有 Claude Pro / Max 账户才有速率限制窗口；API key 账户没有可显示的内容。",
+
         probeNow: "立即查询",
         probeHint: "发送一次极小的 Haiku 请求（约 500 tokens，≈ $0.001 API 等价）。Max 套餐内不另收费，只消耗极少量额度；若当前没有活跃窗口，会启动一个新的 5 小时窗口。",
-        probeClaudeNotFound: "找不到 claude 命令，请在下方填写路径",
+        probeClaudeNotInstalled: "未安装 Claude Code，或它不在 PATH 里。请安装，或在 设置 → Claude Code 指定位置。",
+        probeClaudePathInvalid: "设置里填写的 claude 路径不是可执行文件。",
         probeTimeout: "查询超时（60s）",
+        probeNotLoggedIn: "已安装 Claude Code 但尚未登录。请在终端运行 `claude`，用你的 Claude Pro / Max 账户登录。",
         probeExited: { code, tail in "claude 退出码 \(code)" + (tail.isEmpty ? "" : "：\(tail)") },
         probeNoEvent: "输出里没有 rate_limit_event（API key 用户没有订阅额度）",
 

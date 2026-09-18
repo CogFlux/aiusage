@@ -9,6 +9,11 @@ struct MenuContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            if !store.claudeCodeInstalled {
+                claudeCodeMissing
+            } else if store.fileHasNoQuota, store.snapshot == nil {
+                caption(s.noQuotaInData)
+            }
             Divider()
             ForEach(WindowKind.allCases, id: \.self) { kind in
                 WindowRow(kind: kind,
@@ -20,7 +25,7 @@ struct MenuContentView: View {
             }
             Divider()
             probeSection
-            if !store.hookInstalled {
+            if !store.hookInstalled, store.claudeCodeInstalled {
                 Divider()
                 hookPrompt
             }
@@ -43,6 +48,21 @@ struct MenuContentView: View {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var claudeCodeMissing: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(s.claudeCodeMissingTitle).font(.headline)
+            }
+            caption(s.claudeCodeMissingBody)
+            Button(s.installClaudeCode) {
+                NSWorkspace.shared.open(UsageStore.claudeCodeInstallURL)
+            }
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func sourceLabel(_ source: SnapshotSource) -> String {
