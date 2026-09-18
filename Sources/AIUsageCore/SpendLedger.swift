@@ -55,15 +55,28 @@ public struct SpendLedger: Codable, Equatable, Sendable {
         return total
     }
 
+    public struct BurnRate: Equatable, Sendable {
+        public var perDay: Double
+        /// How much history the average covers; shorter than the requested window while the
+        /// ledger is young, which is worth showing because young averages swing a lot.
+        public var span: TimeInterval
+    }
+
     /// Average spend per day over the trailing `days`, or nil when history is too short to be
-    /// meaningful. Uses the real span of history when it is shorter than `days`.
-    public func burnRatePerDay(days: Double, now: Date, minimumHistory: TimeInterval = 6 * 3600) -> Double? {
+    /// meaningful. Uses the real span of history when it is shorter than `days`. The default
+    /// minimum is a full day: anything shorter sits inside one working stretch and extrapolating
+    /// it to 24 hours overstates the rate.
+    public func burnRate(days: Double, now: Date, minimumHistory: TimeInterval = 24 * 3600) -> BurnRate? {
         guard let first = samples.first else { return nil }
         let windowStart = now.addingTimeInterval(-days * 86400)
         let start = max(first.at, windowStart)
         let span = now.timeIntervalSince(start)
         guard span >= minimumHistory else { return nil }
-        return spent(from: start, to: now) / (span / 86400)
+        return BurnRate(perDay: spent(from: start, to: now) / (span / 86400), span: span)
+    }
+
+    public func burnRatePerDay(days: Double, now: Date, minimumHistory: TimeInterval = 24 * 3600) -> Double? {
+        burnRate(days: days, now: now, minimumHistory: minimumHistory)?.perDay
     }
 
     /// When the balance reaches zero at `ratePerDay`. nil when the rate is zero or unknown.

@@ -99,6 +99,8 @@ struct Strings {
     let deepseekToday: String
     let deepseekThisMonth: String
     let deepseekPerDay: String
+    let deepseekPerDayBasis: (_ span: String) -> String
+    let justNow: String
     let deepseekRunsOut: String
     let deepseekGathering: String
     let deepseekNoKey: String
@@ -224,8 +226,10 @@ struct Strings {
         deepseekToday: "Today",
         deepseekThisMonth: "This month",
         deepseekPerDay: "per day",
+        deepseekPerDayBasis: { "/day (\($0))" },
+        justNow: "just now",
         deepseekRunsOut: "Runs out",
-        deepseekGathering: "Gathering history — burn rate appears after ~6 hours.",
+        deepseekGathering: "Gathering history — the daily burn rate appears after a full day, so one afternoon isn't mistaken for a whole day.",
         deepseekNoKey: "Add your DeepSeek API key in Settings → DeepSeek.",
         deepseekUnauthorized: "DeepSeek rejected the API key (401).",
         deepseekMalformed: "Unexpected response from DeepSeek.",
@@ -330,8 +334,10 @@ struct Strings {
         deepseekToday: "今日",
         deepseekThisMonth: "本月",
         deepseekPerDay: "每天",
+        deepseekPerDayBasis: { "每天 (\($0))" },
+        justNow: "刚刚",
         deepseekRunsOut: "用尽",
-        deepseekGathering: "正在积累历史，约 6 小时后显示燃烧率。",
+        deepseekGathering: "正在积累历史。满一天后才显示每日燃烧率，避免把一个下午的用量当成全天。",
         deepseekNoKey: "请在 设置 → DeepSeek 填入 API key。",
         deepseekUnauthorized: "DeepSeek 拒绝了这个 API key（401）。",
         deepseekMalformed: "DeepSeek 返回了意外的内容。",

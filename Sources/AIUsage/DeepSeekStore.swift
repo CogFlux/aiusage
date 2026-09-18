@@ -165,8 +165,9 @@ final class DeepSeekStore: ObservableObject {
 
     var spentThisMonth: Double { ledger.spent(from: monthInterval.start, to: now) }
 
-    /// Trailing 7-day average, or nil with under 6 hours of history.
-    var burnRatePerDay: Double? { ledger.burnRatePerDay(days: 7, now: now) }
+    /// Trailing 7-day average, or nil with under a full day of history.
+    var burnRate: SpendLedger.BurnRate? { ledger.burnRate(days: 7, now: now) }
+    var burnRatePerDay: Double? { burnRate?.perDay }
 
     var runoutDate: Date? { ledger.runoutDate(ratePerDay: burnRatePerDay, now: now) }
 
@@ -185,6 +186,13 @@ final class DeepSeekStore: ObservableObject {
         f.numberStyle = .currency
         f.currencyCode = currencyCode
         f.locale = locale()
+        // Plain "¥"/"$" rather than the disambiguated "CN¥"/"US$" some locales produce;
+        // the popover is narrow and the account has one currency anyway.
+        switch currencyCode {
+        case "CNY": f.currencySymbol = "¥"
+        case "USD": f.currencySymbol = "$"
+        default: break
+        }
         f.maximumFractionDigits = compact ? 0 : 2
         f.minimumFractionDigits = compact ? 0 : 2
         return f.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)

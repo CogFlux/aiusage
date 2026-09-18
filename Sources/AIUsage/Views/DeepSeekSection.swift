@@ -36,8 +36,8 @@ struct DeepSeekSection: View {
                     stat(s.deepseekBalance, deepseek.money(latest.total))
                     stat(s.deepseekToday, deepseek.money(deepseek.spentToday))
                     stat(s.deepseekThisMonth, deepseek.money(deepseek.spentThisMonth))
-                    if let rate = deepseek.burnRatePerDay {
-                        stat(s.deepseekPerDay, deepseek.money(rate))
+                    if let rate = deepseek.burnRate {
+                        stat(s.deepseekPerDayBasis(spanLabel(rate.span)), deepseek.money(rate.perDay))
                     }
                     if let runout = deepseek.runoutDate {
                         stat(s.deepseekRunsOut, runout.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(store.locale)))
@@ -80,7 +80,13 @@ struct DeepSeekSection: View {
         .padding(.top, 4)
     }
 
+    /// "6h" while the ledger is young, "7d" once the full window is covered.
+    private func spanLabel(_ span: TimeInterval) -> String {
+        span >= 86400 ? "\(Int((span / 86400).rounded()))d" : "\(max(1, Int((span / 3600).rounded())))h"
+    }
+
     private func age(_ date: Date) -> String {
+        if deepseek.now.timeIntervalSince(date) < 60 { return s.justNow }
         let f = RelativeDateTimeFormatter()
         f.locale = store.locale
         f.unitsStyle = .short
@@ -89,8 +95,8 @@ struct DeepSeekSection: View {
 
     private func stat(_ label: String, _ value: String, color: Color = .primary) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.callout.monospacedDigit()).foregroundStyle(color)
+            Text(label).font(.caption2).foregroundStyle(.secondary).fixedSize()
+            Text(value).font(.callout.monospacedDigit()).foregroundStyle(color).fixedSize()
         }
     }
 }

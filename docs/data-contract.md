@@ -115,7 +115,9 @@ So spend is **derived**: the app polls the balance every 5 minutes and feeds a `
 - Only change points are stored (identical balances collapse), plus the time of the last observation.
   Samples older than 90 days are pruned, keeping the last pre-cutoff sample as a baseline.
 - Burn rate = spend over the trailing 7 days ÷ the real span of history in that window; withheld until
-  there are 6 hours of history. Run-out = balance ÷ burn rate.
+  there is a full 24 hours of history, because a shorter span sits inside one working stretch and
+  extrapolating it to a day overstates the rate. The UI labels the span the average covers ("/day (3d)").
+  Run-out = balance ÷ burn rate.
 - Precision is the balance's precision (¥0.01); spend below that is invisible until it accumulates.
 
 The API key lives in `~/Library/Application Support/AIUsage/deepseek.key` with mode 0600 rather than the

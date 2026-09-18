@@ -260,6 +260,7 @@ final class UsageStore: ObservableObject {
     /// Relative age of the current snapshot in the selected language, e.g. "3 minutes ago".
     var snapshotAge: String? {
         guard let snapshot else { return nil }
+        if now.timeIntervalSince(snapshot.observedAt) < 60 { return strings.justNow }
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = locale
         formatter.unitsStyle = .short

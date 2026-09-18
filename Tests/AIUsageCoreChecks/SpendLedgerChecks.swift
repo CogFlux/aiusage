@@ -42,10 +42,13 @@ enum SpendLedgerChecks {
         ledger.record(balance: 99, at: at(1))
         Harness.check(ledger.burnRatePerDay(days: 7, now: at(2)) == nil, "2h of history is too little")
         ledger.record(balance: 88, at: at(24))
+        Harness.check(ledger.burnRatePerDay(days: 7, now: at(23)) == nil, "under a full day is still withheld")
         // 12 spent over 24h with 7-day lookback clipped to the 24h of history → 12/day.
         Harness.close(ledger.burnRatePerDay(days: 7, now: at(24)) ?? -1, 12, "rate over actual history span")
-        // Over a trailing 12h: only the change at 24h (11) counts, span 12h → 22/day.
-        Harness.close(ledger.burnRatePerDay(days: 0.5, now: at(24)) ?? -1, 22, "rate over trailing window")
+        // Over a trailing 12h (minimum lowered for the test): only the change at 24h (11) counts, span 12h → 22/day.
+        Harness.close(ledger.burnRatePerDay(days: 0.5, now: at(24), minimumHistory: 6 * 3600) ?? -1, 22, "rate over trailing window")
+        Harness.close(ledger.burnRate(days: 7, now: at(24))?.span ?? -1, 24 * 3600, "span is the real history when shorter than the window")
+        Harness.close(ledger.burnRate(days: 0.5, now: at(24), minimumHistory: 6 * 3600)?.span ?? -1, 12 * 3600, "span is the window when history is longer")
     }
 
     static func runoutFromRate() {
