@@ -176,11 +176,17 @@ struct WindowRow: View {
                     stat(strings.used, UsageFormatter.percent(pace.usedPercent))
                     stat(strings.budget, UsageFormatter.percent(pace.budgetPercent))
                     stat(strings.delta, UsageFormatter.signed(pace.deltaPercent), color: deltaColor(pace.status))
+                    // Always render both so the row keeps its shape; "—" means too early to
+                    // project, or (for run-out) the window will not hit the target before reset.
                     if let projected = pace.projectedPercent {
                         stat(strings.projected, UsageFormatter.percent(projected))
+                    } else {
+                        stat(strings.projected, "—", color: .secondary)
                     }
                     if let runout = pace.runoutAt {
                         stat(strings.runout, runout <= now ? strings.exhausted : clock(runout))
+                    } else {
+                        stat(strings.runout, "—", color: .secondary)
                     }
                 }
                 if pace.status == .tooEarly {
