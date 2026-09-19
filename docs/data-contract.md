@@ -204,6 +204,33 @@ status = tooEarly            ? tooEarly
 ```
 
 - `runout` may lie in the past (already over target); the UI shows "Exhausted".
+
+### Re-pacing from a checkpoint
+
+A window that was overspent early stays "over pace" until it resets, and the marker stops carrying
+information. The user can set a checkpoint (`PaceCheckpoint { at, usedPercent }`, "Re-pace from now"),
+which treats everything used up to `at` as sunk and spreads only the remainder over the time left. The
+algorithm above runs unchanged on the shifted origin:
+
+```
+origin     = checkpoint.at            (was startsAt)
+base       = checkpoint.usedPercent   (was 0)
+remaining  = targetPercent − base
+progress   = (now − origin) / (resetsAt − origin)
+consumed   = max(0, usedPercent − base)
+
+budget     = base + remaining × progress
+delta      = usedPercent − budget
+tooEarly   = progress < minElapsedFraction  or  now − origin < minElapsedSeconds
+projected  = base + consumed / progress
+runout     = origin + (now − origin) × (remaining / consumed)      # if consumed > 0 and projected > target
+```
+
+`Pace.baselineBudgetPercent` keeps the plain `targetPercent × elapsed` for display (a faint tick on the
+bar), and `Pace.checkpoint` echoes the checkpoint in effect. A checkpoint that cannot shrink the problem
+(`at ≥ resetsAt`, `at < startsAt`, or `usedPercent ≥ targetPercent`) is ignored. The app binds a stored
+checkpoint to a window instance by its `resetsAt` (±120 s, since the two sources may differ by a second),
+so it expires with the window. Menu bar marker and alerts follow the re-paced numbers.
 - While `tooEarly`, `delta` is still computed and may be shown; only `projected` / `runout` are withheld.
 - Stale data: `now − observedAt > 30 min` is flagged stale (default; a UI-layer parameter).
 

@@ -54,8 +54,11 @@ public struct AlertTracker: Equatable, Sendable {
     /// Convenience for the Claude snapshot.
     public mutating func evaluate(snapshot: UsageSnapshot?, now: Date,
                                   paceConfig: PaceConfig = PaceConfig(),
-                                  alertConfig: AlertConfig = AlertConfig()) -> [UsageAlert] {
-        let windows = (snapshot?.windows ?? []).map { PaceWindow.claude($0, config: paceConfig, alerts: alertConfig) }
+                                  alertConfig: AlertConfig = AlertConfig(),
+                                  checkpoints: [WindowKind: PaceCheckpoint] = [:]) -> [UsageAlert] {
+        let windows = (snapshot?.windows ?? []).map {
+            PaceWindow.claude($0, config: paceConfig, alerts: alertConfig, checkpoint: checkpoints[$0.kind])
+        }
         return evaluate(windows: windows, now: now, paceConfig: paceConfig)
     }
 

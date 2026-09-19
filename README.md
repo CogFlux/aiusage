@@ -28,6 +28,12 @@ Details in [docs/data-contract.md](docs/data-contract.md).
 
 Side effect of Query now: if no 5-hour window is currently active, the request starts a new one.
 
+**Re-pace from now** (7-day row). Burnt 60% by Tuesday? The even-pace line will say ▲30 until Sunday,
+which tells you nothing you can act on. Pressing the button treats what is used as spent and paces only
+the remainder over the time left: the bar gains a dashed tick at the checkpoint and a faint one where the
+original budget would be, and Budget / Delta / Projected, the menu bar marker and the notifications all
+switch to the new line. It expires when the window resets; *Clear* removes it earlier.
+
 ## Updates
 
 Packaged releases check for updates through [Sparkle](https://sparkle-project.org) (EdDSA-signed appcast at

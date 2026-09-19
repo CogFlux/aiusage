@@ -20,6 +20,63 @@ enum PaceCalculatorChecks {
         resetWhenPastResetsAt()
         alreadyExhaustedRunoutIsInThePast()
         customTarget()
+        checkpointRebasesBudgetOntoRemainder()
+        checkpointRunoutExtrapolatesFromCheckpoint()
+        checkpointTooEarlyIsRelativeToCheckpoint()
+        degenerateCheckpointIsIgnored()
+    }
+
+    // 7d window (t=0 → 7d). Two days in the user has burnt 60% and re-paces from there:
+    // the remaining 39 points spread over the remaining 5 days.
+    private static let day: TimeInterval = 86400
+    private static let cp = PaceCheckpoint(at: Date(timeIntervalSince1970: 2 * day), usedPercent: 60)
+
+    static func checkpointRebasesBudgetOntoRemainder() {
+        // 4.5 days in = halfway through the remainder: budget = 60 + 39 × 0.5 = 79.5
+        let pace = PaceCalculator.compute(window: window(75, kind: .sevenDay),
+                                          now: Date(timeIntervalSince1970: 4.5 * day), checkpoint: cp)
+        Harness.close(pace.budgetPercent, 79.5, "rebased budget")
+        Harness.close(pace.deltaPercent, -4.5, "delta against the rebased budget")
+        Harness.close(pace.baselineBudgetPercent ?? -1, 99 * 4.5 / 7, "baseline kept for display")
+        Harness.equal(pace.checkpoint, cp, "checkpoint echoed back")
+        Harness.equal(pace.status, .underPace, "status uses the rebased delta")
+        // consumed 15 over half the remainder → 30 by the reset → lands at 90
+        Harness.close(pace.projectedPercent ?? -1, 90, "projected from the checkpoint")
+        Harness.check(pace.runoutAt == nil, "projected under target has no runout")
+        // elapsedFraction stays the plain window progress
+        Harness.close(pace.elapsedFraction, 4.5 / 7, "elapsed fraction unchanged")
+    }
+
+    static func checkpointRunoutExtrapolatesFromCheckpoint() {
+        // One day after the checkpoint another 19.5 points are gone (half the remainder in a
+        // fifth of the time) → target hit 2 days after the checkpoint, at t = 4d.
+        let pace = PaceCalculator.compute(window: window(79.5, kind: .sevenDay),
+                                          now: Date(timeIntervalSince1970: 3 * day), checkpoint: cp)
+        Harness.equal(pace.status, .overPace, "status")
+        Harness.close(pace.projectedPercent ?? -1, 60 + 19.5 * 5, "projected")
+        Harness.close(pace.runoutAt?.timeIntervalSince1970 ?? -1, 4 * day, accuracy: 1e-6, "runout")
+    }
+
+    static func checkpointTooEarlyIsRelativeToCheckpoint() {
+        // Ten minutes after re-pacing: too early by the 15-minute floor, even though the window
+        // itself is two days old.
+        let pace = PaceCalculator.compute(window: window(60, kind: .sevenDay),
+                                          now: Date(timeIntervalSince1970: 2 * day + 600), checkpoint: cp)
+        Harness.equal(pace.status, .tooEarly, "too early after the checkpoint")
+        Harness.check(pace.projectedPercent == nil, "no projection while too early")
+        Harness.close(pace.deltaPercent, 0, accuracy: 0.1, "delta is ~0 right after re-pacing")
+    }
+
+    static func degenerateCheckpointIsIgnored() {
+        let now = Date(timeIntervalSince1970: 4 * day)
+        let plain = PaceCalculator.compute(window: window(70, kind: .sevenDay), now: now)
+        let atTarget = PaceCheckpoint(at: Date(timeIntervalSince1970: 2 * day), usedPercent: 99)
+        let past = PaceCheckpoint(at: Date(timeIntervalSince1970: 8 * day), usedPercent: 50)
+        for bad in [atTarget, past] {
+            let pace = PaceCalculator.compute(window: window(70, kind: .sevenDay), now: now, checkpoint: bad)
+            Harness.close(pace.budgetPercent, plain.budgetPercent, "budget falls back to the plain line")
+            Harness.check(pace.checkpoint == nil && pace.baselineBudgetPercent == nil, "checkpoint reported as not in effect")
+        }
     }
 
     static func budgetIsTargetTimesElapsed() {

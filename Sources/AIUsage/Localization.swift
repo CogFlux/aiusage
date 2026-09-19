@@ -54,6 +54,11 @@ struct Strings {
     let resetNote: String
     let noData: String
     let windowIdle: String
+    let repaceFromNow: String
+    let repaceHelp: String
+    /// "Pacing the remaining X% since <time>"
+    let repacedSince: (_ remaining: String, _ since: String) -> String
+    let repaceClear: String
 
     // Claude Code availability
     let claudeCodeMissingTitle: String
@@ -185,6 +190,10 @@ struct Strings {
         resetNote: "Window has reset; waiting for new data",
         noData: "No data",
         windowIdle: "No active window. Your next message to Claude starts a new one.",
+        repaceFromNow: "Re-pace from now",
+        repaceHelp: "Treat what is used so far as spent and spread the remainder evenly over the time left.",
+        repacedSince: { remaining, since in "Pacing the remaining \(remaining) since \(since)" },
+        repaceClear: "Clear",
 
         claudeCodeMissingTitle: "Claude Code not found",
         claudeCodeMissingBody: "AIUsage reads your quota through Claude Code, which is not installed on this Mac (or is not on your PATH — set its location in Settings → Claude Code).",
@@ -293,6 +302,10 @@ struct Strings {
         resetNote: "窗口已重置，等待下一次数据",
         noData: "暂无数据",
         windowIdle: "当前没有活跃窗口。下一条发给 Claude 的消息会开启新窗口。",
+        repaceFromNow: "从现在开始平均",
+        repaceHelp: "把已用的部分视为沉没，只把余量平均分到剩余时间。",
+        repacedSince: { remaining, since in "自 \(since) 起平均剩余 \(remaining)" },
+        repaceClear: "清除",
 
         claudeCodeMissingTitle: "未找到 Claude Code",
         claudeCodeMissingBody: "AIUsage 通过 Claude Code 读取额度，但这台 Mac 上没有安装它（或它不在 PATH 里——可在 设置 → Claude Code 指定位置）。",

@@ -23,6 +23,14 @@ final class UsageStore: ObservableObject {
         static let notifyRunningOut = "notifyRunningOut"
         static let notifyWindowReset = "notifyWindowReset"
         static let menuBarProvider = "menuBarProvider"
+        static let checkpoints = "paceCheckpoints"
+    }
+
+    /// A user-set "re-pace from now" point, bound to one window instance by its `resetsAt` so it
+    /// silently expires when that window ends.
+    struct StoredCheckpoint: Codable, Equatable {
+        var resetsAt: Date
+        var checkpoint: PaceCheckpoint
     }
 
     enum MenuBarProvider: String, CaseIterable {
@@ -99,6 +107,13 @@ final class UsageStore: ObservableObject {
     var notificationsSupported: Bool { notifier.isSupported }
     private var alertTracker = AlertTracker()
 
+    @Published private(set) var storedCheckpoints: [WindowKind: StoredCheckpoint] = [:] {
+        didSet {
+            let encoded = Dictionary(uniqueKeysWithValues: storedCheckpoints.map { ($0.key.rawValue, $0.value) })
+            UserDefaults.standard.set(try? JSONEncoder().encode(encoded), forKey: Keys.checkpoints)
+        }
+    }
+
     var strings: Strings { Strings.forLanguage(language.resolved) }
     var locale: Locale { language.resolved.locale }
 
@@ -124,6 +139,12 @@ final class UsageStore: ObservableObject {
         notifyWindowReset = defaults.bool(forKey: Keys.notifyWindowReset)
         launchAtLogin = LoginItem.isEnabled
         Strings.current = Strings.forLanguage(storedLanguage.resolved)
+        if let data = defaults.data(forKey: Keys.checkpoints),
+           let decoded = try? JSONDecoder().decode([String: StoredCheckpoint].self, from: data) {
+            storedCheckpoints = Dictionary(uniqueKeysWithValues: decoded.compactMap { key, value in
+                WindowKind(rawValue: key).map { ($0, value) }
+            })
+        }
 
         refreshHookState()
         reloadFromFile()
@@ -185,7 +206,8 @@ final class UsageStore: ObservableObject {
     /// Runs on every new snapshot and every clock tick. The tracker dedupes; here we only filter
     /// by the user's toggles and hand the rest to the notifier.
     private func evaluateAlerts() {
-        let alerts = alertTracker.evaluate(snapshot: snapshot, now: now, paceConfig: config)
+        let alerts = alertTracker.evaluate(snapshot: snapshot, now: now, paceConfig: config,
+                                           checkpoints: activeCheckpoints)
         for alert in alerts {
             let enabled: Bool
             switch alert.kind {
@@ -202,7 +224,44 @@ final class UsageStore: ObservableObject {
     // MARK: Derived state
 
     func pace(for kind: WindowKind) -> Pace? {
-        snapshot?.window(kind).map { PaceCalculator.compute(window: $0, now: now, config: config) }
+        snapshot?.window(kind).map {
+            PaceCalculator.compute(window: $0, now: now, config: config, checkpoint: checkpoint(for: kind))
+        }
+    }
+
+    // MARK: Re-pace checkpoints
+
+    /// The stored checkpoint for `kind`, but only while the window it was set on is the one
+    /// currently reported. A statusline write and a probe may disagree on `resetsAt` by a
+    /// second or two, so the match is loose.
+    func checkpoint(for kind: WindowKind) -> PaceCheckpoint? {
+        guard let stored = storedCheckpoints[kind], let window = snapshot?.window(kind),
+              abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120 else { return nil }
+        return stored.checkpoint
+    }
+
+    private var activeCheckpoints: [WindowKind: PaceCheckpoint] {
+        Dictionary(uniqueKeysWithValues: WindowKind.allCases.compactMap { kind in
+            checkpoint(for: kind).map { (kind, $0) }
+        })
+    }
+
+    /// Whether "re-pace from now" makes sense right now: a live window with quota left.
+    func canRepace(_ kind: WindowKind) -> Bool {
+        guard let window = snapshot?.window(kind) else { return false }
+        return now < window.resetsAt && window.usedPercent < config.targetPercent
+    }
+
+    func repaceFromNow(_ kind: WindowKind) {
+        guard let window = snapshot?.window(kind), canRepace(kind) else { return }
+        storedCheckpoints[kind] = StoredCheckpoint(resetsAt: window.resetsAt,
+                                                   checkpoint: PaceCheckpoint(at: now, usedPercent: window.usedPercent))
+        evaluateAlerts()
+    }
+
+    func clearCheckpoint(_ kind: WindowKind) {
+        storedCheckpoints[kind] = nil
+        evaluateAlerts()
     }
 
     var isStale: Bool {
