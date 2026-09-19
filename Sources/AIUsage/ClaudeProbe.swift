@@ -73,6 +73,8 @@ enum ClaudeProbe {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/zsh")
         p.arguments = ["-lc", "command -v claude"]
+        // Keep shell startup files (prompt plugins, git status) away from the app's cwd.
+        p.currentDirectoryURL = FileManager.default.temporaryDirectory
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = FileHandle.nullDevice
@@ -100,8 +102,19 @@ enum ClaudeProbe {
         process.arguments = arguments
 
         var env = ProcessInfo.processInfo.environment
-        env.removeValue(forKey: "CLAUDECODE")
-        env.removeValue(forKey: "CLAUDE_CODE_ENTRYPOINT")
+        // Session-scoped variables leak in when the app itself was launched from a terminal
+        // running inside Claude Code; the probe must look like a fresh, standalone invocation.
+        for key in ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PID",
+                    "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED",
+                    "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN"] {
+            env.removeValue(forKey: key)
+        }
+        // `Process` changes the working directory but leaves the inherited `PWD` untouched, and
+        // Claude Code trusts `PWD`. If the app was launched from a shell sitting in ~/Documents
+        // (or Desktop, Downloads), the probe would touch that folder and macOS would prompt for
+        // folder access. Point it at the scratch directory instead.
+        env["PWD"] = cwd.path
+        env.removeValue(forKey: "OLDPWD")
         // `--setting-sources ""` drops settings.json, including its `env` block (proxies etc.),
         // so re-apply that block explicitly.
         for (k, v) in extraEnv { env[k] = v }
