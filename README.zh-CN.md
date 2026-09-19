@@ -20,7 +20,7 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 | 来源 | 成本 | 时效 |
 |---|---|---|
 | **Claude Code statusline 钩子**（默认） | 0 | 有会话在跑时实时；空闲时每 60s 刷一次 |
-| **主动查询**（菜单里的按钮） | 一次极小的 Haiku 请求，约 500 tokens ≈ $0.001 API 等价；Max 套餐内不另收费 | 即时 |
+| **主动查询**（菜单里的按钮） | 一次极小的 Haiku 请求，约 500 tokens ≈ $0.001 API 等价；Pro / Max 套餐内不另收费 | 即时 |
 
 两条路都走 Claude Code 官方暴露的接口，不碰 OAuth token，不抓网页。细节见 [docs/data-contract.md](docs/data-contract.md)。
 

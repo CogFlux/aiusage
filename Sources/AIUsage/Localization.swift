@@ -202,7 +202,7 @@ struct Strings {
         precisionNote: "Percentages come from Claude's rate-limit headers, which report whole points rounded down. Claude Code's /usage screen may read up to one point higher.",
 
         probeNow: "Query now",
-        probeHint: "Sends one tiny Haiku request (~500 tokens, ≈ $0.001 API-equivalent). Included in a Max subscription; uses a negligible slice of quota. If no window is active, this starts a new 5-hour window.",
+        probeHint: "Sends one tiny Haiku request (~500 tokens, ≈ $0.001 API-equivalent). Covered by your Pro or Max subscription; uses a negligible slice of quota. If no window is active, this starts a new 5-hour window.",
         probeClaudeNotInstalled: "Claude Code is not installed, or not on your PATH. Install it, or set its location in Settings → Claude Code.",
         probeClaudePathInvalid: "The claude path in Settings does not point to an executable.",
         probeTimeout: "Query timed out (60s)",
@@ -314,7 +314,7 @@ struct Strings {
         precisionNote: "百分比来自 Claude 的速率限制响应头，只有整数精度且向下取整；Claude Code 的 /usage 可能比这里高 1 个点。",
 
         probeNow: "立即查询",
-        probeHint: "发送一次极小的 Haiku 请求（约 500 tokens，≈ $0.001 API 等价）。Max 套餐内不另收费，只消耗极少量额度；若当前没有活跃窗口，会启动一个新的 5 小时窗口。",
+        probeHint: "发送一次极小的 Haiku 请求（约 500 tokens，≈ $0.001 API 等价）。Pro / Max 套餐内不另收费，只消耗极少量额度；若当前没有活跃窗口，会启动一个新的 5 小时窗口。",
         probeClaudeNotInstalled: "未安装 Claude Code，或它不在 PATH 里。请安装，或在 设置 → Claude Code 指定位置。",
         probeClaudePathInvalid: "设置里填写的 claude 路径不是可执行文件。",
         probeTimeout: "查询超时（60s）",

@@ -81,7 +81,7 @@ Notes:
 
 - The event is emitted before the model's reply, so the reply content is irrelevant.
 - Measured cost (Claude Code 2.1.274, Haiku 4.5): ~400 input + 100–200 output tokens, `total_cost_usd ≈ 0.001`.
-  Max subscriptions are not billed in dollars; this consumes a negligible slice of quota.
+  Pro and Max subscriptions are not billed in dollars; this consumes a negligible slice of quota.
 - **Side effect**: if no 5-hour window is active, the request starts a new one. The UI must say so.
 - `--setting-sources ""` also drops the `env` block of `settings.json` (proxies etc.); the caller must read it
   and inject it into the child process environment explicitly.

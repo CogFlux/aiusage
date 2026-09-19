@@ -21,7 +21,7 @@ how much actually is, whether you are ahead or behind, and when you would run ou
 | Source | Cost | Freshness |
 |---|---|---|
 | **Claude Code statusline hook** (default) | none | live while a session is running; refreshed every 60s when idle |
-| **Query now** (button in the menu) | one tiny Haiku request, ~500 tokens ≈ $0.001 API-equivalent; included in a Max subscription | instant |
+| **Query now** (button in the menu) | one tiny Haiku request, ~500 tokens ≈ $0.001 API-equivalent; covered by a Pro or Max subscription | instant |
 
 Both paths use interfaces Claude Code exposes officially. No OAuth tokens, no web scraping.
 Details in [docs/data-contract.md](docs/data-contract.md).
