@@ -172,8 +172,7 @@ Parameters (`PaceConfig`, defaults):
 | Name | Default | Meaning |
 |---|---|---|
 | `targetPercent` | 99 | The usage level planned for the moment the window resets |
-| `minElapsedFraction` | 0.05 | No projection below this window progress |
-| `minElapsedSeconds` | 900 | No projection below this elapsed time |
+| `minElapsed` | 5h: 15 min, 7d: 1 h | Per window. No projection before this much time has passed since the origin (window start, or the re-pace checkpoint). A fraction of the window would hide the 7-day projection for most of a day. DeepSeek's month budget uses 12 h |
 | `onTrackTolerance` | 5h: 5, 7d: 3 | Per window. |delta| within this counts as on track. The 5-hour window moves in bursts and needs slack; the 7-day window is smooth and a 5-point miss there is a day's quota |
 
 Algorithm (`now` is the current time):
@@ -187,7 +186,7 @@ elapsedSeconds  = max(0, now − startsAt)
 elapsed         = min(1, elapsedSeconds / duration)
 budget          = targetPercent × elapsed
 delta           = usedPercent − budget                 # >0 over pace, <0 under pace
-tooEarly        = elapsed < minElapsedFraction  or  elapsedSeconds < minElapsedSeconds
+tooEarly        = elapsedSeconds < minElapsed[kind]
 
 if not tooEarly and elapsed > 0:
     projected   = usedPercent / elapsed                # usage at window end at the current average rate
@@ -221,7 +220,7 @@ consumed   = max(0, usedPercent − base)
 
 budget     = base + remaining × progress
 delta      = usedPercent − budget
-tooEarly   = progress < minElapsedFraction  or  now − origin < minElapsedSeconds
+tooEarly   = now − origin < minElapsed[kind]
 projected  = base + consumed / progress
 runout     = origin + (now − origin) × (remaining / consumed)      # if consumed > 0 and projected > target
 ```

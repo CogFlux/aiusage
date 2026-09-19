@@ -15,7 +15,7 @@ enum PaceCalculatorChecks {
         overPaceProducesRunout()
         onTrackWithinTolerance()
         tooEarlyWithholdsProjection()
-        tooEarlyByFractionForSevenDayWindow()
+        sevenDayWaitsAnHourBeforeProjecting()
         sevenDayUsesTighterTolerance()
         resetWhenPastResetsAt()
         alreadyExhaustedRunoutIsInThePast()
@@ -58,7 +58,7 @@ enum PaceCalculatorChecks {
     }
 
     static func checkpointTooEarlyIsRelativeToCheckpoint() {
-        // Ten minutes after re-pacing: too early by the 15-minute floor, even though the window
+        // Ten minutes after re-pacing: too early by the 7-day floor (1 h), even though the window
         // itself is two days old.
         let pace = PaceCalculator.compute(window: window(60, kind: .sevenDay),
                                           now: Date(timeIntervalSince1970: 2 * day + 600), checkpoint: cp)
@@ -112,10 +112,13 @@ enum PaceCalculatorChecks {
         Harness.close(pace.deltaPercent, 3 - 99 * (600.0 / 18000), "delta is still reported")
     }
 
-    static func tooEarlyByFractionForSevenDayWindow() {
-        // 5% of 7d is 8.4h; 3h in is past the 15-min floor but under the fraction floor.
-        let pace = PaceCalculator.compute(window: window(1, kind: .sevenDay), now: Date(timeIntervalSince1970: 3 * 3600))
-        Harness.equal(pace.status, .tooEarly, "7d window 3h in is too early")
+    static func sevenDayWaitsAnHourBeforeProjecting() {
+        // 50 minutes into the week: still too early for the 7-day window (1 h floor)...
+        var pace = PaceCalculator.compute(window: window(2, kind: .sevenDay), now: Date(timeIntervalSince1970: 50 * 60))
+        Harness.equal(pace.status, .tooEarly, "7d window 50 min in is too early")
+        // ...and at 61 minutes the projection appears.
+        pace = PaceCalculator.compute(window: window(2, kind: .sevenDay), now: Date(timeIntervalSince1970: 61 * 60))
+        Harness.check(pace.projectedPercent != nil, "7d window projects after an hour")
     }
 
     static func sevenDayUsesTighterTolerance() {

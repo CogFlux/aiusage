@@ -176,7 +176,7 @@ final class DeepSeekStore: ObservableObject {
         let month = monthInterval
         return PaceWindow(id: Self.windowID, usedPercent: spentThisMonth / monthlyBudget * 100,
                           startsAt: month.start, resetsAt: month.end,
-                          tolerance: 3, runningOutLead: 2 * 86400)
+                          tolerance: 3, runningOutLead: 2 * 86400, minElapsed: 12 * 3600)
     }
 
     var budgetPace: Pace? { budgetWindow.map { PaceCalculator.compute($0, now: now) } }

@@ -204,8 +204,8 @@ struct WindowRow: View {
                         stat(strings.runout, "—", color: .secondary)
                     }
                 }
-                if pace.status == .tooEarly {
-                    note(strings.tooEarlyNote)
+                if pace.status == .tooEarly, let from = pace.projectionAvailableAt {
+                    note(strings.tooEarlyNote(clock(from)))
                 } else if pace.status == .reset {
                     note(strings.resetNote)
                 }

@@ -3,9 +3,14 @@ import Foundation
 public struct PaceConfig: Equatable, Sendable {
     /// The usage level we plan to reach exactly when the window resets.
     public var targetPercent: Double = 99
-    /// Below either threshold the projection is meaningless (divides by ~0), so it is withheld.
-    public var minElapsedFraction: Double = 0.05
-    public var minElapsedSeconds: TimeInterval = 15 * 60
+    /// Before this much of a window (or of the stretch after a re-pace checkpoint) has passed,
+    /// the projection divides by ~0 and is withheld. Per window: a fixed fraction would keep the
+    /// 7-day projection hidden for most of a day, which is longer than anyone waits.
+    public var minElapsed: [WindowKind: TimeInterval] = [.fiveHour: 15 * 60, .sevenDay: 60 * 60]
+
+    public func minElapsed(for kind: WindowKind) -> TimeInterval {
+        minElapsed[kind] ?? 15 * 60
+    }
     /// |delta| within this band counts as on track. Per window: the 5-hour window moves in
     /// bursts and needs slack; the 7-day window is smooth, and a 5-point miss there is a
     /// day's worth of quota, so it gets a tighter band.
@@ -62,10 +67,13 @@ public struct Pace: Equatable, Sendable {
     /// The plain even-pace budget from the window start, kept for display while a checkpoint
     /// rebases `budgetPercent`. nil when no checkpoint is in effect.
     public var baselineBudgetPercent: Double?
+    /// While `tooEarly`: when the projection will start to be shown.
+    public var projectionAvailableAt: Date?
 
     public init(usedPercent: Double, elapsedFraction: Double, budgetPercent: Double, deltaPercent: Double,
                 projectedPercent: Double?, runoutAt: Date?, status: PaceStatus,
-                checkpoint: PaceCheckpoint? = nil, baselineBudgetPercent: Double? = nil) {
+                checkpoint: PaceCheckpoint? = nil, baselineBudgetPercent: Double? = nil,
+                projectionAvailableAt: Date? = nil) {
         self.usedPercent = usedPercent
         self.elapsedFraction = elapsedFraction
         self.budgetPercent = budgetPercent
@@ -75,6 +83,7 @@ public struct Pace: Equatable, Sendable {
         self.status = status
         self.checkpoint = checkpoint
         self.baselineBudgetPercent = baselineBudgetPercent
+        self.projectionAvailableAt = projectionAvailableAt
     }
 }
 
@@ -90,17 +99,21 @@ public struct PaceWindow: Equatable, Sendable {
     public var tolerance: Double
     /// How close `runoutAt` must be before a running-out alert fires.
     public var runningOutLead: TimeInterval
+    /// No projection until this long after the origin (window start or checkpoint).
+    public var minElapsed: TimeInterval
     /// Optional "re-pace from here" point; see `PaceCheckpoint`.
     public var checkpoint: PaceCheckpoint?
 
     public init(id: String, usedPercent: Double, startsAt: Date, resetsAt: Date,
-                tolerance: Double, runningOutLead: TimeInterval, checkpoint: PaceCheckpoint? = nil) {
+                tolerance: Double, runningOutLead: TimeInterval, minElapsed: TimeInterval = 15 * 60,
+                checkpoint: PaceCheckpoint? = nil) {
         self.id = id
         self.usedPercent = usedPercent
         self.startsAt = startsAt
         self.resetsAt = resetsAt
         self.tolerance = tolerance
         self.runningOutLead = runningOutLead
+        self.minElapsed = minElapsed
         self.checkpoint = checkpoint
     }
 
@@ -110,6 +123,7 @@ public struct PaceWindow: Equatable, Sendable {
                    startsAt: window.startsAt, resetsAt: window.resetsAt,
                    tolerance: config.tolerance(for: window.kind),
                    runningOutLead: alerts.runningOutLead[window.kind] ?? 30 * 60,
+                   minElapsed: config.minElapsed(for: window.kind),
                    checkpoint: checkpoint)
     }
 }
@@ -148,7 +162,7 @@ public enum PaceCalculator {
 
         let budget = base + remaining * progress
         let delta = window.usedPercent - budget
-        let tooEarly = progress < config.minElapsedFraction || sinceOrigin < config.minElapsedSeconds
+        let tooEarly = sinceOrigin < window.minElapsed
 
         var projected: Double?
         var runout: Date?
@@ -175,6 +189,7 @@ public enum PaceCalculator {
 
         return Pace(usedPercent: window.usedPercent, elapsedFraction: elapsed, budgetPercent: budget,
                     deltaPercent: delta, projectedPercent: projected, runoutAt: runout, status: status,
-                    checkpoint: cp, baselineBudgetPercent: cp == nil ? nil : baseline)
+                    checkpoint: cp, baselineBudgetPercent: cp == nil ? nil : baseline,
+                    projectionAvailableAt: tooEarly ? origin.addingTimeInterval(window.minElapsed) : nil)
     }
 }

@@ -50,7 +50,8 @@ struct Strings {
     let projected: String
     let runout: String
     let exhausted: String
-    let tooEarlyNote: String
+    /// "Too early to project; projection from <time>"
+    let tooEarlyNote: (_ from: String) -> String
     let resetNote: String
     let noData: String
     let windowIdle: String
@@ -186,7 +187,7 @@ struct Strings {
         projected: "Projected",
         runout: "Runs out",
         exhausted: "Exhausted",
-        tooEarlyNote: "Window just started; no projection yet",
+        tooEarlyNote: { from in "Too early to project; projection from \(from)" },
         resetNote: "Window has reset; waiting for new data",
         noData: "No data",
         windowIdle: "No active window. Your next message to Claude starts a new one.",
@@ -298,7 +299,7 @@ struct Strings {
         projected: "预计",
         runout: "用尽",
         exhausted: "已用尽",
-        tooEarlyNote: "窗口刚开始，暂不投影",
+        tooEarlyNote: { from in "刚开始，暂不投影；\(from) 起显示预计" },
         resetNote: "窗口已重置，等待下一次数据",
         noData: "暂无数据",
         windowIdle: "当前没有活跃窗口。下一条发给 Claude 的消息会开启新窗口。",
