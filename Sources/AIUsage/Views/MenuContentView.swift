@@ -242,15 +242,13 @@ struct WindowRow: View {
     private func repaceRow(pace: Pace, actions: RepaceActions) -> some View {
         if let checkpoint = pace.checkpoint {
             HStack(spacing: 8) {
-                Image(systemName: "flag.checkered").font(.caption).foregroundStyle(.secondary)
                 Text(repaceCaption(pace: pace, checkpoint: checkpoint))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
                 Spacer(minLength: 6)
                 Button(strings.repaceClear, action: actions.clear)
-                    .controlSize(.mini)
+                    .controlSize(.small)
             }
         } else if actions.available {
             HStack {
