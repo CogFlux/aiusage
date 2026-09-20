@@ -13,6 +13,13 @@ enum UsageFormatterChecks {
         idleTitles()
         countdown()
         signed()
+        marker()
+    }
+
+    static func marker() {
+        Harness.equal(UsageFormatter.marker(delta: 32.4, tolerance: 3), "▲32", "over")
+        Harness.equal(UsageFormatter.marker(delta: -4, tolerance: 3), "▼4", "under")
+        Harness.equal(UsageFormatter.marker(delta: 2.9, tolerance: 3), "●", "within tolerance")
     }
 
     static func menuBarTitles() {

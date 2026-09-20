@@ -241,9 +241,19 @@ struct WindowRow: View {
     @ViewBuilder
     private func repaceRow(pace: Pace, actions: RepaceActions) -> some View {
         if let checkpoint = pace.checkpoint {
+            let config = PaceConfig()
+            var caption = strings.repacedSince(UsageFormatter.percent(config.targetPercent - checkpoint.usedPercent),
+                                               clock(checkpoint.at))
+            // The original line is still on the bar as the faint tick; spell out its delta too,
+            // so a glance at "the whole week" needs no mode switch.
+            if let baseline = pace.baselineBudgetPercent {
+                let overall = UsageFormatter.marker(delta: pace.usedPercent - baseline,
+                                                    tolerance: config.tolerance(for: kind))
+                caption += " · " + strings.repaceOverall(overall)
+            }
             HStack(spacing: 8) {
                 Image(systemName: "flag.checkered").font(.caption).foregroundStyle(.secondary)
-                Text(strings.repacedSince(UsageFormatter.percent(PaceConfig().targetPercent - checkpoint.usedPercent), clock(checkpoint.at)))
+                Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -41,6 +41,14 @@ public enum UsageFormatter {
         return r > 0 ? "+\(r)" : "\(r)"
     }
 
+    /// The pace marker on its own — "▲9", "▼3" or "●" — for a delta judged against `tolerance`.
+    /// Same symbols as the menu bar title, so a delta shown elsewhere reads the same way.
+    public static func marker(delta: Double, tolerance: Double) -> String {
+        if delta > tolerance { return "▲" + magnitude(delta) }
+        if delta < -tolerance { return "▼" + magnitude(delta) }
+        return "●"
+    }
+
     static func magnitude(_ value: Double) -> String {
         "\(Int(abs(value).rounded()))"
     }

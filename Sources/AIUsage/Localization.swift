@@ -59,6 +59,8 @@ struct Strings {
     let repaceHelp: String
     /// "Pacing the remaining X% since <time>"
     let repacedSince: (_ remaining: String, _ since: String) -> String
+    /// "overall ▲32": the delta against the original, un-re-paced budget
+    let repaceOverall: (_ marker: String) -> String
     let repaceClear: String
 
     // Claude Code availability
@@ -194,6 +196,7 @@ struct Strings {
         repaceFromNow: "Re-pace from now",
         repaceHelp: "Treat what is used so far as spent and spread the remainder evenly over the time left.",
         repacedSince: { remaining, since in "Pacing the remaining \(remaining) since \(since)" },
+        repaceOverall: { marker in "overall \(marker)" },
         repaceClear: "Clear",
 
         claudeCodeMissingTitle: "Claude Code not found",
@@ -306,6 +309,7 @@ struct Strings {
         repaceFromNow: "从现在开始平均",
         repaceHelp: "把已用的部分视为沉没，只把余量平均分到剩余时间。",
         repacedSince: { remaining, since in "自 \(since) 起平均剩余 \(remaining)" },
+        repaceOverall: { marker in "整体 \(marker)" },
         repaceClear: "清除",
 
         claudeCodeMissingTitle: "未找到 Claude Code",
