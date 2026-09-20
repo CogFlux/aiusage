@@ -246,10 +246,11 @@ struct WindowRow: View {
                 Text(repaceCaption(pace: pace, checkpoint: checkpoint))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 6)
                 Button(strings.repaceClear, action: actions.clear)
-                    .controlSize(.small)
+                    .controlSize(.mini)
             }
         } else if actions.available {
             HStack {
