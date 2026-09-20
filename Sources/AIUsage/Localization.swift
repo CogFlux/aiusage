@@ -252,8 +252,8 @@ struct Strings {
 
         launchAtLogin: "Launch at login",
         notifications: "Notifications",
-        notifyOverPace: "When a window goes over pace",
-        notifyRunningOut: "When quota will run out before the reset",
+        notifyOverPace: "Early warning: usage crosses the pace tolerance (±5 for 5h, ±3 for 7d)",
+        notifyRunningOut: "Last call: at the current rate the limit is 30 min (5h) / 12 h (7d) away",
         notifyWindowReset: "When the 5-hour window resets",
         notificationsDenied: "Notifications are turned off for AIUsage in System Settings → Notifications.",
         sendTestNotification: "Send test notification",
@@ -365,8 +365,8 @@ struct Strings {
 
         launchAtLogin: "登录时启动",
         notifications: "通知",
-        notifyOverPace: "窗口超速时",
-        notifyRunningOut: "额度将在重置前用完时",
+        notifyOverPace: "预警：用量越过容差（5h ±5、7d ±3）时",
+        notifyRunningOut: "最后提醒：按当前速度距用尽还有 30 分钟（5h）/ 12 小时（7d）时",
         notifyWindowReset: "5 小时窗口重置时",
         notificationsDenied: "AIUsage 的通知已在 系统设置 → 通知 中被关闭。",
         sendTestNotification: "发送测试通知",
