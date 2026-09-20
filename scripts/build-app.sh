@@ -38,6 +38,8 @@ cp "$BIN" "$APP/Contents/MacOS/AIUsage"
 cp -R "$RES" "$APP/Contents/Resources/"
 # The binary links Sparkle via @rpath/../Frameworks (see Package.swift linkerSettings).
 cp -R "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/"
+# App icon (Finder, notifications, Sparkle dialogs). Regenerate with scripts/make-icon.sh.
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 SPARKLE_PLIST=""
 if [ -n "$SU_PUBLIC_KEY" ]; then
@@ -54,6 +56,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string></array>
   <key>CFBundleExecutable</key><string>AIUsage</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>AIUsage</string>
