@@ -64,8 +64,14 @@ struct SettingsView: View {
 
             if store.notificationsSupported {
                 Section(s.notifications) {
-                    Toggle(s.notifyOverPace, isOn: $store.notifyOverPace)
-                    Toggle(s.notifyRunningOut, isOn: $store.notifyRunningOut)
+                    Toggle(isOn: $store.notifyOverPace) {
+                        Text(s.notifyOverPace)
+                        Text(s.notifyOverPaceHint)
+                    }
+                    Toggle(isOn: $store.notifyRunningOut) {
+                        Text(s.notifyRunningOut)
+                        Text(s.notifyRunningOutHint)
+                    }
                     Toggle(s.notifyWindowReset, isOn: $store.notifyWindowReset)
                     if store.notificationStatus.denied || store.notificationStatus.bannersOff {
                         HStack(alignment: .top) {

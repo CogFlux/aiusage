@@ -123,6 +123,8 @@ struct Strings {
     let notifications: String
     let notifyOverPace: String
     let notifyRunningOut: String
+    let notifyOverPaceHint: String
+    let notifyRunningOutHint: String
     let notifyWindowReset: String
     let notificationsDenied: String
     let sendTestNotification: String
@@ -252,8 +254,10 @@ struct Strings {
 
         launchAtLogin: "Launch at login",
         notifications: "Notifications",
-        notifyOverPace: "Early warning: usage crosses the pace tolerance (±5 for 5h, ±3 for 7d)",
-        notifyRunningOut: "Last call: at the current rate the limit is 30 min (5h) / 12 h (7d) away",
+        notifyOverPace: "Over pace (early warning)",
+        notifyRunningOut: "Running out (last call)",
+        notifyOverPaceHint: "Usage crosses the tolerance: ±5 for 5h, ±3 for 7d",
+        notifyRunningOutHint: "At the current rate the limit is 30 min (5h) / 12 h (7d) away",
         notifyWindowReset: "When the 5-hour window resets",
         notificationsDenied: "Notifications are turned off for AIUsage in System Settings → Notifications.",
         sendTestNotification: "Send test notification",
@@ -365,8 +369,10 @@ struct Strings {
 
         launchAtLogin: "登录时启动",
         notifications: "通知",
-        notifyOverPace: "预警：用量越过容差（5h ±5、7d ±3）时",
-        notifyRunningOut: "最后提醒：按当前速度距用尽还有 30 分钟（5h）/ 12 小时（7d）时",
+        notifyOverPace: "超速（预警）",
+        notifyRunningOut: "即将用尽（最后提醒）",
+        notifyOverPaceHint: "用量越过容差时：5h ±5，7d ±3",
+        notifyRunningOutHint: "按当前速度距用尽还有 30 分钟（5h）/ 12 小时（7d）时",
         notifyWindowReset: "5 小时窗口重置时",
         notificationsDenied: "AIUsage 的通知已在 系统设置 → 通知 中被关闭。",
         sendTestNotification: "发送测试通知",
