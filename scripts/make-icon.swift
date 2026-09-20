@@ -1,4 +1,5 @@
-// Draws the app icon: a pace bar on a dark rounded square, echoing the popover's PaceBar.
+// Draws the app icon: the website's favicon at Dock scale — a pace bar on a near-black
+// rounded square, filled green and short of the even-pace tick ("under budget").
 // Usage: swift scripts/make-icon.swift <output.png>   (1024×1024, then see scripts/make-icon.sh)
 import AppKit
 
@@ -22,33 +23,34 @@ let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _
     ctx.fillPath()
     ctx.restoreGState()
 
-    // Background: a deep blue-grey gradient, lighter at the top.
+    // Background: #111 like the favicon, with a faint top-to-bottom falloff so it reads as a
+    // surface rather than a flat hole in the Dock.
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
-    let colors = [CGColor(red: 0.20, green: 0.23, blue: 0.30, alpha: 1),
-                  CGColor(red: 0.09, green: 0.10, blue: 0.14, alpha: 1)] as CFArray
+    let colors = [CGColor(gray: 0.13, alpha: 1),
+                  CGColor(gray: 0.055, alpha: 1)] as CFArray
     let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])!
     ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: square.maxY), end: CGPoint(x: 0, y: square.minY), options: [])
     ctx.restoreGState()
 
-    // The bar: track, fill to 62%, and the even-pace tick at 50% — "a little over pace".
+    // The bar, in the favicon's proportions: track, green fill to 45%, tick at 56% — under pace.
     let barHeight = square.height * 0.16
     let barRect = CGRect(x: square.minX + square.width * 0.14,
                          y: square.midY - barHeight / 2,
                          width: square.width * 0.72, height: barHeight)
     let track = CGPath(roundedRect: barRect, cornerWidth: barHeight / 2, cornerHeight: barHeight / 2, transform: nil)
     ctx.addPath(track)
-    ctx.setFillColor(CGColor(gray: 1, alpha: 0.14))
+    ctx.setFillColor(CGColor(gray: 0.27, alpha: 1))
     ctx.fillPath()
 
-    let fillRect = CGRect(x: barRect.minX, y: barRect.minY, width: barRect.width * 0.62, height: barHeight)
+    let fillRect = CGRect(x: barRect.minX, y: barRect.minY, width: barRect.width * 0.45, height: barHeight)
     ctx.addPath(CGPath(roundedRect: fillRect, cornerWidth: barHeight / 2, cornerHeight: barHeight / 2, transform: nil))
-    ctx.setFillColor(CGColor(red: 1.0, green: 0.36, blue: 0.32, alpha: 1))
+    ctx.setFillColor(CGColor(red: 0.204, green: 0.780, blue: 0.349, alpha: 1))   // #34c759
     ctx.fillPath()
 
     let tickWidth = square.width * 0.03
-    let tickRect = CGRect(x: barRect.minX + barRect.width * 0.5 - tickWidth / 2,
+    let tickRect = CGRect(x: barRect.minX + barRect.width * 0.56 - tickWidth / 2,
                           y: barRect.minY - barHeight * 0.45,
                           width: tickWidth, height: barHeight * 1.9)
     ctx.addPath(CGPath(roundedRect: tickRect, cornerWidth: tickWidth / 2, cornerHeight: tickWidth / 2, transform: nil))
