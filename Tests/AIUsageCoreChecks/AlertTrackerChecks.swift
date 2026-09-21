@@ -14,6 +14,40 @@ enum AlertTrackerChecks {
         runningOutFiresWithinLeadOnly()
         windowResetFiresOnceAfterResetsAt()
         tooEarlyNeverFires()
+        overPaceHoveringOnTheThresholdFiresOnce()
+        overPaceCooldownSpacesRepeats()
+    }
+
+    // Delta oscillating around the 5h tolerance (+5): 4.6 ↔ 5.4 must not re-fire. Re-arm needs
+    // delta ≤ tolerance − 2 = 3.
+    static func overPaceHoveringOnTheThresholdFiresOnce() {
+        var tracker = AlertTracker()
+        // 2h in: budget 39.6. 45.2% → +5.6 over.
+        var alerts = tracker.evaluate(snapshot: snap(45.2, at: 7200), now: at(7200))
+        Harness.equal(alerts.map(\.kind), [.overPace], "fires on entry")
+        // A minute later 44.8% → +5.2 − budget crept up: 39.8 → +5.0, on track by a hair.
+        alerts = tracker.evaluate(snapshot: snap(44.8, at: 7260), now: at(7260))
+        Harness.check(alerts.isEmpty, "dipping just under the line fires nothing")
+        // Back over: 45.6% at 2h02m (budget 40.3) → +5.3.
+        alerts = tracker.evaluate(snapshot: snap(45.6, at: 7320), now: at(7320))
+        Harness.check(alerts.isEmpty, "hovering back over does not re-fire (hysteresis)")
+        // Genuine recovery: 43% at 2.5h (budget 49.5) → −6.5, re-arms; then over again much later.
+        _ = tracker.evaluate(snapshot: snap(43, at: 9000), now: at(9000))
+        alerts = tracker.evaluate(snapshot: snap(80, at: 12600), now: at(12600))
+        Harness.equal(alerts.map(\.kind), [.overPace], "fires again after a real recovery and the cooldown")
+    }
+
+    static func overPaceCooldownSpacesRepeats() {
+        var tracker = AlertTracker()
+        // Over at 1h (40% vs 19.8), recover fully at 1.5h (25% vs 29.7 → −4.7 ≤ 3), over again at 1.6h.
+        var alerts = tracker.evaluate(snapshot: snap(40, at: 3600), now: at(3600))
+        Harness.equal(alerts.map(\.kind), [.overPace], "first alert")
+        _ = tracker.evaluate(snapshot: snap(25, at: 5400), now: at(5400))
+        alerts = tracker.evaluate(snapshot: snap(45, at: 5760), now: at(5760))
+        Harness.check(alerts.isEmpty, "re-armed but inside the 1 h cooldown: silent")
+        // Still over once the cooldown has passed: fires then.
+        alerts = tracker.evaluate(snapshot: snap(50, at: 7300), now: at(7300))
+        Harness.equal(alerts.map(\.kind), [.overPace], "fires once the cooldown has elapsed")
     }
 
     static func overPaceFiresOnceAndRearms() {

@@ -101,12 +101,14 @@ public struct PaceWindow: Equatable, Sendable {
     public var runningOutLead: TimeInterval
     /// No projection until this long after the origin (window start or checkpoint).
     public var minElapsed: TimeInterval
+    /// Minimum gap between two over-pace alerts for one instance of this window.
+    public var overPaceCooldown: TimeInterval
     /// Optional "re-pace from here" point; see `PaceCheckpoint`.
     public var checkpoint: PaceCheckpoint?
 
     public init(id: String, usedPercent: Double, startsAt: Date, resetsAt: Date,
                 tolerance: Double, runningOutLead: TimeInterval, minElapsed: TimeInterval = 15 * 60,
-                checkpoint: PaceCheckpoint? = nil) {
+                overPaceCooldown: TimeInterval = 60 * 60, checkpoint: PaceCheckpoint? = nil) {
         self.id = id
         self.usedPercent = usedPercent
         self.startsAt = startsAt
@@ -114,6 +116,7 @@ public struct PaceWindow: Equatable, Sendable {
         self.tolerance = tolerance
         self.runningOutLead = runningOutLead
         self.minElapsed = minElapsed
+        self.overPaceCooldown = overPaceCooldown
         self.checkpoint = checkpoint
     }
 
@@ -124,6 +127,7 @@ public struct PaceWindow: Equatable, Sendable {
                    tolerance: config.tolerance(for: window.kind),
                    runningOutLead: alerts.runningOutLead[window.kind] ?? 30 * 60,
                    minElapsed: config.minElapsed(for: window.kind),
+                   overPaceCooldown: alerts.overPaceCooldown[window.kind] ?? 60 * 60,
                    checkpoint: checkpoint)
     }
 }

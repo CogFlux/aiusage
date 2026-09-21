@@ -233,6 +233,19 @@ so it expires with the window. Menu bar marker and alerts follow the re-paced nu
 - While `tooEarly`, `delta` is still computed and may be shown; only `projected` / `runout` are withheld.
 - Stale data: `now − observedAt > 30 min` is flagged stale (default; a UI-layer parameter).
 
+### Alerts
+
+`AlertTracker` is a pure state machine fed every snapshot and clock tick; it decides which of three
+alerts fire and dedupes them per window instance (`id` + `resetsAt`).
+
+| Alert | Fires when | Repeats |
+|---|---|---|
+| `overPace` | status enters `overPace` | Only after delta has dropped to `tolerance − rearmMargin` (margin 2, capped at tolerance ⁄ 2: 5h re-arms at +3, 7d at +1.5) **and** at least `overPaceCooldown` after the last one (5h: 1 h, 7d: 6 h, DeepSeek month: 24 h). A delta hovering on the threshold therefore alerts once. |
+| `runningOut` | `runoutAt` is before the reset and within `runningOutLead` (5h: 30 min, 7d: 12 h) | Once per instance |
+| `windowReset` | `now` passes the `resetsAt` of an instance that was being tracked | Once per instance |
+
+`tooEarly` suppresses everything.
+
 ## 4. Text rendering (menu bar title)
 
 `"<5h|7d> " + body [+ " ⧗" when stale]`
