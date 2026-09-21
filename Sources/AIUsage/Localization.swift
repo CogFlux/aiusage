@@ -57,8 +57,8 @@ struct Strings {
     let windowIdle: String
     let repaceFromNow: String
     let repaceHelp: String
-    /// "Pacing the remaining X% since <time>"
-    let repacedSince: (_ remaining: String, _ since: String) -> String
+    /// "36% left · re-paced 1d 3h ago"
+    let repacedSince: (_ remaining: String, _ ago: String) -> String
     /// "overall ▲32": the delta against the original, un-re-paced budget
     let repaceOverall: (_ marker: String) -> String
     let repaceClear: String
@@ -197,7 +197,7 @@ struct Strings {
         windowIdle: "No active window. Your next message to Claude starts a new one.",
         repaceFromNow: "Re-pace from now",
         repaceHelp: "Treat what is used so far as spent and spread the remainder evenly over the time left.",
-        repacedSince: { remaining, since in "\(remaining) left, paced since \(since)" },
+        repacedSince: { remaining, ago in "\(remaining) left · re-paced \(ago) ago" },
         repaceOverall: { marker in "overall \(marker)" },
         repaceClear: "Clear",
 
@@ -312,7 +312,7 @@ struct Strings {
         windowIdle: "当前没有活跃窗口。下一条发给 Claude 的消息会开启新窗口。",
         repaceFromNow: "从现在开始平均",
         repaceHelp: "把已用的部分视为沉没，只把余量平均分到剩余时间。",
-        repacedSince: { remaining, since in "\(since) 起平均剩余 \(remaining)" },
+        repacedSince: { remaining, ago in "剩余 \(remaining) · \(ago) 前重定" },
         repaceOverall: { marker in "整体 \(marker)" },
         repaceClear: "清除",
 

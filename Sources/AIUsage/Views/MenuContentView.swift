@@ -262,8 +262,9 @@ struct WindowRow: View {
 
     private func repaceCaption(pace: Pace, checkpoint: PaceCheckpoint) -> String {
         let config = PaceConfig()
+        // "1d 3h ago" stays short whatever the locale's date format does once a day has passed.
         var caption = strings.repacedSince(UsageFormatter.percent(config.targetPercent - checkpoint.usedPercent),
-                                           clock(checkpoint.at))
+                                           UsageFormatter.countdown(to: now, from: checkpoint.at))
         // The original line is still on the bar as the faint tick; spell out its delta too, so a
         // glance at "the whole week" needs no mode switch.
         if let baseline = pace.baselineBudgetPercent {
