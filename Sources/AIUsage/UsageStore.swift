@@ -237,8 +237,8 @@ final class UsageStore: ObservableObject {
     func checkpoint(for kind: WindowKind) -> PaceCheckpoint? {
         guard let stored = storedCheckpoints[kind], let window = snapshot?.window(kind),
               abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120 else { return nil }
-        // Usage fell below the point we re-paced from — a quota reset credit, say. The sunk
-        // amount the checkpoint assumes is no longer sunk, so the checkpoint means nothing.
+        // Usage fell below the point we re-paced from — a quota reset credit. `merge` deletes
+        // these; this covers the moment before it runs.
         guard window.usedPercent >= stored.checkpoint.usedPercent else { return nil }
         return stored.checkpoint
     }
@@ -333,7 +333,21 @@ final class UsageStore: ObservableObject {
     private func merge(_ incoming: UsageSnapshot) {
         snapshot = snapshot?.merging(incoming) ?? incoming
         now = Date()
+        dropCheckpointsOvertakenByAReset()
         evaluateAlerts()
+    }
+
+    /// A quota reset credit zeroes usage without changing `resetsAt`, so a checkpoint set earlier
+    /// in the window survives an event that invalidates it: the amount it treats as sunk is back.
+    /// Delete it rather than ignore it — usage climbing past the old base again must not revive a
+    /// checkpoint anchored before the credit.
+    private func dropCheckpointsOvertakenByAReset() {
+        for (kind, stored) in storedCheckpoints {
+            guard let window = snapshot?.window(kind),
+                  abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120,
+                  window.usedPercent < stored.checkpoint.usedPercent else { continue }
+            storedCheckpoints[kind] = nil
+        }
     }
 
     // MARK: Active source (claude -p probe)

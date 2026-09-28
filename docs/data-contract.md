@@ -183,7 +183,8 @@ Each `UsageWindow` carries its own `observedAt` for this, since a merge can keep
 snapshot and take the other from the newer one. Residual: right after a credit, a session that has not yet
 made an API call can re-emit the pre-credit number, which reads as an increase and is taken; the next fresh
 write corrects it, and "Query now" is authoritative at any moment. A re-pace checkpoint whose base is above
-the current usage is dropped, since the amount it treats as sunk no longer is.
+the current usage is deleted, not just ignored: the amount it treats as sunk has come back, and usage later
+climbing past that base again must not revive a line anchored before the credit.
 
 Pace after a credit needs no special case: `budget` still counts from the window start, so usage of 0% at
 85% elapsed reads as `▼85` — correct, and the sign the allowance now exceeds what the remaining time can
