@@ -27,6 +27,7 @@ final class UsageStore: ObservableObject {
         static let checkpoints = "paceCheckpoints"
         static let restorePoints = "paceRestorePoints"
         static let lastSnapshot = "lastSnapshot"
+        static let sessionTracker = "sessionTracker"
     }
 
     /// A user-set "re-pace from now" point, bound to one window instance by its `resetsAt` so it
@@ -46,6 +47,10 @@ final class UsageStore: ObservableObject {
     /// after a quota credit the file may well hold a stale session's pre-credit number.
     @Published private(set) var snapshot: UsageSnapshot? {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(snapshot), forKey: Keys.lastSnapshot) }
+    }
+    /// Persisted with the snapshot: a restart must still know which sessions are idle.
+    private var sessionTracker = SessionTracker() {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(sessionTracker), forKey: Keys.sessionTracker) }
     }
     @Published private(set) var now = Date()
     @Published private(set) var probeState: ProbeState = .idle
@@ -172,6 +177,10 @@ final class UsageStore: ObservableObject {
            let remembered = try? JSONDecoder().decode(UsageSnapshot?.self, from: data) {
             snapshot = remembered
         }
+        if let data = defaults.data(forKey: Keys.sessionTracker),
+           let remembered = try? JSONDecoder().decode(SessionTracker.self, from: data) {
+            sessionTracker = remembered
+        }
         storedCheckpoints = Self.loadPoints(forKey: Keys.checkpoints)
         restorePoints = Self.loadPoints(forKey: Keys.restorePoints)
 
@@ -187,7 +196,7 @@ final class UsageStore: ObservableObject {
     private func tick() {
         now = Date()
         evaluateAlerts()
-        if notifyOverPace || notifyRunningOut || notifyWindowReset {
+        if notifyOverPace || notifyRunningOut || notifyWindowReset || notifyQuotaRestored {
             refreshNotificationStatus()
         }
     }
@@ -374,10 +383,11 @@ final class UsageStore: ObservableObject {
         return formatter.localizedString(for: snapshot.observedAt, relativeTo: now)
     }
 
-    /// See `UsageSnapshot.merging` for the rule.
+    /// See `MergePolicy` for the rule; the tracker says whether `incoming` is a live reading.
     private func merge(_ incoming: UsageSnapshot) {
+        let provenance = sessionTracker.provenance(of: incoming)
         let previous = snapshot
-        snapshot = snapshot?.merging(incoming) ?? incoming
+        snapshot = snapshot?.merging(incoming, provenance: provenance) ?? incoming
         now = Date()
         recordQuotaRestores(since: previous)
         evaluateAlerts()
@@ -389,12 +399,11 @@ final class UsageStore: ObservableObject {
     /// line anchored before the credit — and the credit itself becomes the sensible pace origin.
     private func recordQuotaRestores(since previous: UsageSnapshot?) {
         for kind in WindowKind.allCases {
-            guard let before = previous?.window(kind), let after = snapshot?.window(kind),
-                  abs(after.resetsAt.timeIntervalSince(before.resetsAt)) < 120,
-                  before.usedPercent - after.usedPercent >= AlertConfig().quotaRestoredDropPoints else { continue }
+            guard let after = snapshot?.window(kind), let creditAt = after.creditAt,
+                  creditAt != previous?.window(kind)?.creditAt else { continue }
             storedCheckpoints[kind] = nil
             restorePoints[kind] = StoredCheckpoint(resetsAt: after.resetsAt,
-                                                   checkpoint: PaceCheckpoint(at: now, usedPercent: after.usedPercent))
+                                                   checkpoint: PaceCheckpoint(at: creditAt, usedPercent: after.usedPercent))
         }
     }
 

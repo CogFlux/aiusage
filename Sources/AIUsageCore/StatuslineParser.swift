@@ -1,7 +1,8 @@
 import Foundation
 
 /// Parses the JSON Claude Code passes to a status line command on stdin.
-/// Only `rate_limits` is read; see https://code.claude.com/docs/en/statusline
+/// Reads `rate_limits`, plus `session_id` and `cost` to tell a live reading from a re-emit.
+/// See https://code.claude.com/docs/en/statusline
 public enum StatuslineParser {
     public struct InvalidJSON: Error {}
 
@@ -22,7 +23,13 @@ public enum StatuslineParser {
                                        resetsAt: Date(timeIntervalSince1970: resets), observedAt: observedAt))
         }
         guard !windows.isEmpty else { return nil }
-        return UsageSnapshot(source: .statusline, observedAt: observedAt, windows: windows)
+        let cost = root["cost"] as? [String: Any]
+        let session = (root["session_id"] as? String).flatMap { id in
+            JSONNumber.double(cost?["total_api_duration_ms"]).map {
+                SessionStamp(id: id, apiDurationMs: $0, durationMs: JSONNumber.double(cost?["total_duration_ms"]))
+            }
+        }
+        return UsageSnapshot(source: .statusline, observedAt: observedAt, windows: windows, session: session)
     }
 }
 

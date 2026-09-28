@@ -45,10 +45,9 @@ public struct AlertConfig: Equatable, Sendable {
     /// Minimum time between two `overPace` alerts for the same window instance, per Claude window.
     public var overPaceCooldown: [WindowKind: TimeInterval] = [.fiveHour: 60 * 60, .sevenDay: 6 * 3600]
     /// A drop of at least this many points inside a live window counts as a quota reset credit.
-    /// Matches `MergePolicy.genuineDropPoints`: below it a lower reading is treated as a stale one.
-    public var quotaRestoredDropPoints: Double = 10
-    /// A pre-credit reading re-emitted by a session that has not refreshed reads as a rise and
-    /// then a second fall; ignore a repeat within this window so one credit notifies once.
+    /// Matches `MergePolicy.creditDropPoints`, the only drop the merge lets through.
+    public var quotaRestoredDropPoints: Double = 5
+    /// One credit can reach the merge twice (a session's write, then a probe); notify once.
     public var quotaRestoredCooldown: TimeInterval = 10 * 60
     public init() {}
 }

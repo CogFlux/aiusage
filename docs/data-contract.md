@@ -17,16 +17,18 @@ JSON **verbatim** to:
 ```
 
 - Write method: write `claude-statusline.json.<pid>.tmp`, then `mv -f` over the target. Readers only ever see a complete file.
-- Several Claude Code sessions writing concurrently is normal; quota is account-wide, so any writer's data is valid.
-  **The file with the newest mtime wins.**
+- Several Claude Code sessions writing concurrently is normal; quota is account-wide, so any writer's data is valid,
+  but not necessarily current. See the merge rule below.
 - The file's mtime is the observation time (`observedAt`). The hook adds no fields to the JSON.
 - Timing is decided by Claude Code: every assistant message, `/compact`, the `refreshInterval` (set to 60s at
   install), and when a window reaches its `resets_at`. **The file does not update while no session is running.**
 
-Only `rate_limits` is read:
+Read: `rate_limits`, plus `session_id` and `cost` to tell which writes carry a new API response:
 
 ```json
 {
+  "session_id": "dfc09c42-…",
+  "cost": { "total_api_duration_ms": 9053422, "total_duration_ms": 374791088, "...": "ignored" },
   "rate_limits": {
     "five_hour": { "used_percentage": 23.5, "resets_at": 1738425600 },
     "seven_day": { "used_percentage": 41.2, "resets_at": 1738857600 },
@@ -39,6 +41,8 @@ Only `rate_limits` is read:
 |---|---|---|
 | `used_percentage` | number | **0–100** |
 | `resets_at` | number | Unix seconds |
+| `cost.total_api_duration_ms` | number | Grows only when the writing process makes an API call |
+| `cost.total_duration_ms` | number | Wall time since the writing process started |
 
 Absence rules (from the official docs): `rate_limits` appears only for Pro/Max subscribers and only after the
 first API response in a session; `five_hour` / `seven_day` may each be absent independently; Claude Code drops a
@@ -152,42 +156,43 @@ two-decimal fraction that appears to be **truncated** (0.186 → 0.18). Claude C
 more precise internal value and rounds, so it can read up to one point higher than AIUsage. This is a
 property of the source, not a bug; do not "correct" for it.
 
-Merge rule (`UsageSnapshot.merging`), applied whenever a new observation arrives from either source:
+Merge rule (`UsageSnapshot.merging` with `MergePolicy`), applied whenever a new observation arrives:
 
 1. An observation older than the current snapshot is ignored entirely.
-2. Per window: if `resetsAt` is unchanged (same window instance), the **higher** `usedPercent` wins — usage is
-   monotonic within a window. If `resetsAt` differs, the window has reset and the incoming value wins.
+2. Per window, a later `resetsAt` (by more than 120 s) is the next window instance and wins outright; an
+   earlier one is a previous instance re-emitted and is ignored. Within 120 s it is the same instance, which
+   keeps the `resetsAt` it was first seen with.
 3. A window missing from the incoming snapshot is kept only while its `resetsAt` is still in the future.
 4. `observedAt` and `source` follow the incoming snapshot.
 
 Why not "newest write wins": several Claude Code sessions share the statusline file, and an idle session
 re-emits its last-known numbers every `refreshInterval` with a fresh mtime. Its `rate_limits` reflect that
-session's last API response, so the newest write is not the newest truth. Consequently `observedAt` means
-"last time any source reported", not "last API response".
+session's last API response, which can be any age — a session left open overnight trails by a day on the
+7-day window. Consequently `observedAt` means "last time any source reported", not "last API response".
 
-A lower reading is therefore usually an older one — but not always. **A quota reset credit zeroes
-`used_percentage` and leaves `resets_at` untouched** (confirmed 2026-09-28): the quota comes back, the
-clock does not, so the restored allowance has only the remainder of the window to be spent in. Since the
-window instance is unchanged, the drop is the only evidence, and `MergePolicy` separates it from a stale
-write without being able to date the numbers themselves:
+Usage only rises inside a window instance, except that **a quota reset credit zeroes `used_percentage` and
+leaves `resets_at` untouched** (confirmed 2026-09-28). The size of a drop cannot separate a credit from an
+idle session, so the merge asks instead whether the reading is *fresh* — straight from an API response —
+using `SessionTracker`:
+
+- The probe is always fresh.
+- A statusline write is fresh when its writer's `total_api_duration_ms` has grown since that writer's
+  previous write. A writer is a process, not a session: two terminals that resumed the same session write
+  under one `session_id` with separate totals (seen live), so writers are told apart by their start time,
+  `observedAt − total_duration_ms` (±30 s).
+- A writer seen for the first time is never fresh — nothing dates its numbers, and a resumed session may
+  carry numbers from before it was closed. Writers silent for 8 days are forgotten. The tracker is persisted.
+
+Same instance, then:
 
 | Incoming | Result |
 |---|---|
-| Higher usage, or a different `resetsAt` | Taken |
-| From the probe | Taken — a probe is a live API round-trip, never stale |
-| Lower by ≥ `genuineDropPoints` (10) | Taken — an idle session's numbers do not trail that far |
-| Lower by less, within `maxHold` (10 min) of the held reading | Held |
-| Lower by less, older than `maxHold` | Taken |
+| Fresh, lower by ≥ `creditDropPoints` (5) | Taken, and recorded as the window's `creditAt` |
+| Fresh, lower by less | Held — noise between sources (the probe reports a fraction, the statusline a rounded percentage) |
+| Fresh, higher | Taken |
+| Stale, from a writer whose last fresh reading predates `creditAt` (or unknown) | Ignored — a pre-credit number, however high |
+| Otherwise stale | The higher value wins |
 
-Each `UsageWindow` carries its own `observedAt` for this, since a merge can keep one window from the older
-snapshot and take the other from the newer one. Accepting a credit also arms an `EchoGuard` on the window:
-a session that has not made an API call since keeps re-emitting the pre-credit number, which reads as a
-rise and would be taken. What marks it as an echo is not elapsed time — the stale session may stay open all
-day — but that it is *frozen*: readings at or above the pre-credit level (less `echoGuardMargin`, 2 points)
-are ignored while they stay at or below the highest already seen, and the guard lifts as soon as one comes
-in above it, which only a session genuinely burning quota produces. A probe clears it outright. The same
-rule undoes a misread: two sessions far enough apart look like a credit at the instant of the drop, and the
-next, higher reading wins it back.
 A re-pace checkpoint whose base is above
 the current usage is deleted, not just ignored: the amount it treats as sunk has come back, and usage later
 climbing past that base again must not revive a line anchored before the credit.
@@ -199,7 +204,7 @@ reuses `PaceCheckpoint` (origin = the credit, base = usage just after it, so a p
 but it is a correction rather than a user setting — the popover shows none of the re-pace caption, Clear
 button or extra ticks for it, and only a checkpoint the user set by hand does. A hand-set checkpoint takes
 precedence over the credit's, and clearing it falls back to the credit's rather than to the pre-credit line. The `quotaRestored` alert (`AlertConfig.quotaRestoredDropPoints`, the same
-10 points; `quotaRestoredCooldown` suppresses an echo from a session that has not refreshed) notifies,
+5 points; `quotaRestoredCooldown` keeps one credit reported by two sources to one notification) notifies,
 since no `windowReset` can fire here.
 
 ## 3. Pace calculation

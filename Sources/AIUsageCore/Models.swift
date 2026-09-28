@@ -29,16 +29,17 @@ public struct UsageWindow: Codable, Equatable, Sendable {
     /// When these numbers were observed. Carried per window (not just per snapshot) because a
     /// merge may keep one window from an older snapshot while taking the other from the newer one.
     public var observedAt: Date
-    /// Set when a quota credit is accepted; see `EchoGuard`.
-    public var echoGuard: EchoGuard?
+    /// When a quota reset credit was last seen to land in this window instance. Readings that
+    /// predate it are pre-credit numbers and no longer count; see `MergePolicy`.
+    public var creditAt: Date?
 
     public init(kind: WindowKind, usedPercent: Double, resetsAt: Date, observedAt: Date = Date(),
-                echoGuard: EchoGuard? = nil) {
+                creditAt: Date? = nil) {
         self.kind = kind
         self.usedPercent = usedPercent
         self.resetsAt = resetsAt
         self.observedAt = observedAt
-        self.echoGuard = echoGuard
+        self.creditAt = creditAt
     }
 
     /// Claude only reports the reset time; the window is assumed to be
@@ -53,73 +54,121 @@ public enum SnapshotSource: String, Codable, Sendable {
     case probe
 }
 
-/// A session that has not made an API call since a quota credit keeps re-emitting the pre-credit
-/// number. That reads as a rise, which the merge would normally take, so usage visibly jumps back.
-///
-/// What separates an echo from a genuinely higher reading is not how long ago the credit was — the
-/// stale session may sit there all day — but that an echo is *frozen*: it repeats one value, while
-/// a session that is really burning quota reports a rising one. So the guard blocks suspect
-/// readings only while they stay at or below the highest already seen, and lifts the moment one
-/// comes in above it. That also undoes itself if the drop was never a credit at all (two sessions
-/// far enough apart look the same at the instant of the drop): the next reading is higher, and the
-/// guard is gone.
-public struct EchoGuard: Codable, Equatable, Sendable {
-    /// Usage was here before the credit, so readings from here up are suspect.
-    public var above: Double
-    /// The highest suspect reading so far. Anything above it is growth, not a repeat.
-    public var highestSeen: Double
+/// Which Claude Code session wrote a statusline snapshot, and how much API time it has spent.
+public struct SessionStamp: Codable, Equatable, Sendable {
+    public var id: String
+    /// `cost.total_api_duration_ms`: grows only when the session makes an API call, which is also
+    /// the only time its `rate_limits` change. A write where it has not grown is a re-emit.
+    public var apiDurationMs: Double
+    /// `cost.total_duration_ms`: wall time since this process started.
+    public var durationMs: Double?
 
-    public init(above: Double, highestSeen: Double) {
-        self.above = above
-        self.highestSeen = highestSeen
+    public init(id: String, apiDurationMs: Double, durationMs: Double? = nil) {
+        self.id = id
+        self.apiDurationMs = apiDurationMs
+        self.durationMs = durationMs
     }
 }
 
-/// How `UsageSnapshot.merging` decides between a held higher reading and a lower incoming one.
+/// Whether a snapshot carries numbers from an API response that just happened.
+public enum Provenance: Equatable, Sendable {
+    /// Straight from a live response: the probe, or a session whose API time just grew.
+    case fresh
+    /// A session re-emitting what it last heard. `lastFreshAt` is when that session last had a
+    /// live response, so its numbers are at least that old; nil when unknown.
+    case stale(lastFreshAt: Date?)
+}
+
+/// Remembers every statusline writer, so each write can be classified as fresh or a re-emit.
+///
+/// Several Claude Code sessions share the statusline file, and an idle one rewrites its last-known
+/// numbers every `refreshInterval`. Its numbers can trail the truth by any amount — a session left
+/// open overnight is a day behind on the 7-day window — so the size of a drop says nothing about
+/// whether it is stale. Whether the writer's API time moved does.
+///
+/// A writer is a process, not a session: two terminals that resumed the same session write under
+/// one `session_id` with separate API totals, and alternating between them would look like growth.
+/// `observedAt − durationMs` is the process's start, which stays put for one process and differs
+/// between two, so it tells them apart.
+///
+/// A writer seen for the first time is never trusted: nothing shows how old its numbers are, and a
+/// resumed session may well carry numbers from before it was closed. One more API call settles it.
+public struct SessionTracker: Codable, Equatable, Sendable {
+    public struct Entry: Codable, Equatable, Sendable {
+        public var sessionID: String
+        public var startedAt: Date?
+        public var apiDurationMs: Double
+        public var lastFreshAt: Date?
+        public var seenAt: Date
+    }
+
+    /// How far two computed start times of one process may drift apart (write latency, rounding).
+    public static let startTolerance: TimeInterval = 30
+    /// Writers not heard from for this long are forgotten.
+    public static let forgetAfter: TimeInterval = 8 * 86400
+
+    public private(set) var entries: [Entry] = []
+
+    public init() {}
+
+    public mutating func provenance(of snapshot: UsageSnapshot) -> Provenance {
+        if snapshot.source == .probe { return .fresh }
+        // Without a session stamp (older Claude Code) nothing can be told apart.
+        guard let session = snapshot.session else { return .stale(lastFreshAt: nil) }
+        let at = snapshot.observedAt
+        let startedAt = session.durationMs.map { at.addingTimeInterval(-$0 / 1000) }
+        let index = entries.firstIndex { entry in
+            guard entry.sessionID == session.id else { return false }
+            guard let a = entry.startedAt, let b = startedAt else { return entry.startedAt == startedAt }
+            return abs(a.timeIntervalSince(b)) < Self.startTolerance
+        }
+        let previous = index.map { entries[$0] }
+        let fresh = previous.map { session.apiDurationMs > $0.apiDurationMs } ?? false
+        let lastFreshAt = fresh ? at : previous?.lastFreshAt
+        let entry = Entry(sessionID: session.id, startedAt: startedAt, apiDurationMs: session.apiDurationMs,
+                          lastFreshAt: lastFreshAt, seenAt: at)
+        if let index { entries[index] = entry } else { entries.append(entry) }
+        entries.removeAll { at.timeIntervalSince($0.seenAt) >= Self.forgetAfter }
+        return fresh ? .fresh : .stale(lastFreshAt: lastFreshAt)
+    }
+}
+
+/// How `UsageSnapshot.merging` decides between the reading it holds and an incoming one.
+///
+/// Usage only ever rises inside a window instance, except when a quota reset credit zeroes it
+/// (`resetsAt` does not move). So a fresh reading is the truth, and one well below what is held
+/// means a credit landed. A stale reading can only add information by being higher — unless it
+/// predates the last credit, in which case it is a pre-credit number and is ignored however high.
 public struct MergePolicy: Equatable, Sendable {
-    /// A drop bigger than this is not an idle session re-emitting slightly older numbers: usage
-    /// genuinely went down, which is what a quota reset credit does inside a live window.
-    public var genuineDropPoints: Double = 10
-    /// Whatever the size of the drop, a higher reading is only held this long. After that the
-    /// newest observation wins, so a smaller genuine decrease still surfaces on its own.
-    public var maxHold: TimeInterval = 10 * 60
-    /// How far below the pre-credit reading the echo guard starts, so slightly older echoes are
-    /// caught too.
-    public var echoGuardMargin: Double = 2
+    /// A fresh reading this far below the held one is a credit. Smaller dips are the noise between
+    /// sources (the probe reports a fraction, the statusline a rounded percentage).
+    public var creditDropPoints: Double = 5
+    /// Two reports of one window instance may disagree on `resetsAt` by a second or so.
+    public var sameInstanceTolerance: TimeInterval = 120
 
     public init() {}
 
     /// Which of the two readings of one window to keep.
-    public func resolve(current: UsageWindow, incoming: UsageWindow, fromProbe: Bool, now: Date) -> UsageWindow {
-        // A different reset time is a different window instance: nothing carries over.
-        guard current.resetsAt == incoming.resetsAt else { return incoming }
-        // A probe is a live API round-trip. It is the truth, and it settles any open question.
-        if fromProbe {
-            var taken = incoming
-            taken.echoGuard = nil
-            return taken
-        }
+    public func resolve(current: UsageWindow, incoming: UsageWindow, provenance: Provenance) -> UsageWindow {
+        let gap = incoming.resetsAt.timeIntervalSince(current.resetsAt)
+        if gap > sameInstanceTolerance { return incoming }   // the next window instance
+        if gap < -sameInstanceTolerance { return current }   // a previous one, re-emitted
         var taken = incoming
-        taken.echoGuard = current.echoGuard
-
-        if let guarded = current.echoGuard, incoming.usedPercent >= guarded.above {
-            // Above everything seen since the credit: real growth, so believe it and stand down.
-            guard incoming.usedPercent <= guarded.highestSeen else {
-                taken.echoGuard = nil
+        // One identity per instance, whatever jitter the sources have.
+        taken.resetsAt = current.resetsAt
+        taken.creditAt = current.creditAt
+        let drop = current.usedPercent - incoming.usedPercent
+        switch provenance {
+        case .fresh:
+            if drop >= creditDropPoints {
+                taken.creditAt = incoming.observedAt
                 return taken
             }
-            return current
+            return drop > 0 ? current : taken
+        case let .stale(lastFreshAt):
+            if let credit = current.creditAt, (lastFreshAt ?? .distantPast) < credit { return current }
+            return drop < 0 ? taken : current
         }
-
-        let drop = current.usedPercent - incoming.usedPercent
-        if drop >= genuineDropPoints {
-            taken.echoGuard = EchoGuard(above: current.usedPercent - echoGuardMargin,
-                                        highestSeen: current.usedPercent)
-            return taken
-        }
-        // A smaller drop is more likely an idle session's older numbers; hold, but not forever.
-        if drop > 0, now.timeIntervalSince(current.observedAt) < maxHold { return current }
-        return taken
     }
 }
 
@@ -129,32 +178,35 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     /// When the numbers were true. For the statusline file this is the file's mtime.
     public var observedAt: Date
     public var windows: [UsageWindow]
+    /// The statusline writer; nil for the probe.
+    public var session: SessionStamp?
 
-    public init(provider: String = "claude", source: SnapshotSource, observedAt: Date, windows: [UsageWindow]) {
+    public init(provider: String = "claude", source: SnapshotSource, observedAt: Date, windows: [UsageWindow],
+                session: SessionStamp? = nil) {
         self.provider = provider
         self.source = source
         self.observedAt = observedAt
         self.windows = windows
+        self.session = session
     }
 
     public func window(_ kind: WindowKind) -> UsageWindow? {
         windows.first { $0.kind == kind }
     }
 
-    /// Combine with a newer observation. Several Claude Code sessions write the statusline file,
-    /// and an idle one re-emits its last-known numbers every `refreshInterval`, so the most recent
-    /// write is not the most recent truth — a lower reading is usually just an older one.
-    /// It is not always: a quota reset credit lowers usage inside a live window. So a drop is
-    /// held rather than ignored, and only while it still looks like staleness (see `MergePolicy`).
-    /// A different `resetsAt` means a new window instance; the newer observation wins outright.
-    public func merging(_ incoming: UsageSnapshot, policy: MergePolicy = MergePolicy()) -> UsageSnapshot {
+    /// Combine with a newer observation; see `MergePolicy` for how one window is decided.
+    /// `provenance` defaults to what the source alone implies: a probe is fresh, a statusline
+    /// write of unknown origin is not.
+    /// A window missing from `incoming` is kept only while it is still live.
+    public func merging(_ incoming: UsageSnapshot, provenance: Provenance? = nil,
+                        policy: MergePolicy = MergePolicy()) -> UsageSnapshot {
         guard incoming.observedAt >= observedAt else { return self }
+        let origin = provenance ?? (incoming.source == .probe ? .fresh : .stale(lastFreshAt: nil))
         var merged = incoming
         merged.windows = WindowKind.allCases.compactMap { kind in
             switch (window(kind), incoming.window(kind)) {
             case let (current?, new?):
-                return policy.resolve(current: current, incoming: new,
-                                      fromProbe: incoming.source == .probe, now: incoming.observedAt)
+                return policy.resolve(current: current, incoming: new, provenance: origin)
             case let (_, new?):
                 return new
             case let (current?, nil):

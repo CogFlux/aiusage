@@ -34,11 +34,18 @@ enum ParserChecks {
         mergeTakesNewerWindowInstance()
         mergeIgnoresOlderObservation()
         mergeDropsExpiredWindowMissingFromIncoming()
-        mergeAcceptsLargeDropAsGenuine()
-        mergeReleasesASmallDropAfterMaxHold()
+        mergeIgnoresAPreviousWindowInstance()
+        mergeTakesAFreshCredit()
+        mergeIgnoresAStaleDropHoweverLarge()
+        mergeHoldsASmallFreshDip()
         mergeLetsTheProbeOverrideAHeldValue()
-        mergeIgnoresThePreCreditEcho()
-        mergeRecoversFromAMisreadDrop()
+        mergeIgnoresPreCreditEchoes()
+        mergeKeepsOneResetTimePerInstance()
+        statuslineParsesTheSessionStamp()
+        trackerTellsLiveReadingsFromReEmits()
+        trackerNeverTrustsAFirstSighting()
+        trackerSeparatesTwoProcessesOfOneSession()
+        trackerForgetsOldSessions()
     }
 
     private static func snap(_ source: SnapshotSource, at t: TimeInterval, fiveHour: (Double, TimeInterval)?, sevenDay: (Double, TimeInterval)?) -> UsageSnapshot {
@@ -53,59 +60,123 @@ enum ParserChecks {
         return UsageSnapshot(source: source, observedAt: at, windows: windows)
     }
 
-    /// A quota reset credit lowers usage inside a live window (same `resetsAt`), which the
-    /// stale-write rule used to swallow.
-    static func mergeAcceptsLargeDropAsGenuine() {
+    static func mergeIgnoresAPreviousWindowInstance() {
+        // A session still holding the previous 5-hour instance must not replace the current one.
+        let current = snap(.statusline, at: 1000, fiveHour: (5, 38000), sevenDay: nil)
+        let previous = snap(.statusline, at: 1060, fiveHour: (90, 20000), sevenDay: nil)
+        Harness.equal(current.merging(previous).window(.fiveHour)?.usedPercent, 5, "an earlier resetsAt is ignored")
+    }
+
+    /// A quota reset credit lowers usage inside a live window (same `resetsAt`).
+    static func mergeTakesAFreshCredit() {
         let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
         let credited = snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (0, 600000))
-        Harness.equal(current.merging(credited).window(.sevenDay)?.usedPercent, 0, "a big drop is taken at once")
+        let merged = current.merging(credited, provenance: .fresh)
+        Harness.equal(merged.window(.sevenDay)?.usedPercent, 0, "a fresh big drop is taken at once")
+        Harness.equal(merged.window(.sevenDay)?.creditAt, Date(timeIntervalSince1970: 1060), "and recorded as a credit")
     }
 
-    static func mergeReleasesASmallDropAfterMaxHold() {
+    /// An idle session left open overnight trails by a day's worth of 7-day usage. However big the
+    /// gap, a re-emit is not evidence of a credit.
+    static func mergeIgnoresAStaleDropHoweverLarge() {
+        let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (45, 600000))
+        let idle = snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (30, 600000))
+        let merged = current.merging(idle, provenance: .stale(lastFreshAt: Date(timeIntervalSince1970: 500)))
+        Harness.equal(merged.window(.sevenDay)?.usedPercent, 45, "a stale drop is ignored")
+        Harness.check(merged.window(.sevenDay)?.creditAt == nil, "and is no credit")
+    }
+
+    static func mergeHoldsASmallFreshDip() {
+        // The probe reports a fraction, the statusline a rounded percentage.
         let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
-        // 5 points is within stale-write range, so it is held...
-        let soon = snap(.statusline, at: 1300, fiveHour: nil, sevenDay: (65, 600000))
-        Harness.equal(current.merging(soon).window(.sevenDay)?.usedPercent, 70, "small drop held while fresh")
-        // ...but not forever: past maxHold the newest reading wins.
-        let later = snap(.statusline, at: 1000 + 601, fiveHour: nil, sevenDay: (65, 600000))
-        Harness.equal(current.merging(later).window(.sevenDay)?.usedPercent, 65, "small drop accepted after maxHold")
+        let dip = snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (68, 600000))
+        Harness.equal(current.merging(dip, provenance: .fresh).window(.sevenDay)?.usedPercent, 70, "a small fresh dip is noise")
     }
 
-    /// After a credit, a session that has not refreshed re-emits the pre-credit number. That is a
-    /// rise, which would otherwise be taken, and usage would visibly jump back.
-    static func mergeIgnoresThePreCreditEcho() {
+    /// After a credit, a session that has not made a call since keeps re-emitting the pre-credit
+    /// number. It reads as a rise, and usage must not jump back to it — for however long that
+    /// session stays open.
+    static func mergeIgnoresPreCreditEchoes() {
         let before = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
-        let credited = before.merging(snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (0, 600000)))
-        Harness.equal(credited.window(.sevenDay)?.usedPercent, 0, "the credit is taken")
-
-        // The stale session repeats 70 for as long as it stays open — however long that is.
-        var held = credited
-        for t in stride(from: 1120.0, through: 20000, by: 600) {
-            held = held.merging(snap(.statusline, at: t, fiveHour: nil, sevenDay: (70, 600000)))
+        var held = before.merging(snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (0, 600000)), provenance: .fresh)
+        for t in stride(from: 1120.0, through: 90000, by: 3600) {
+            held = held.merging(snap(.statusline, at: t, fiveHour: nil, sevenDay: (70, 600000)),
+                                provenance: .stale(lastFreshAt: Date(timeIntervalSince1970: 900)))
             Harness.equal(held.window(.sevenDay)?.usedPercent, 0, "the echo is ignored at t=\(Int(t))")
         }
-        // Real usage after the credit still gets through, and the guard stays armed.
-        let grown = held.merging(snap(.statusline, at: 20600, fiveHour: nil, sevenDay: (4, 600000)))
-        Harness.equal(grown.window(.sevenDay)?.usedPercent, 4, "genuine growth is taken")
-        Harness.check(grown.window(.sevenDay)?.echoGuard != nil, "the guard survives an ordinary update")
-        // A probe overrules it: it is a live call, so 70 there would be the truth.
-        let probe = snap(.probe, at: 21000, fiveHour: nil, sevenDay: (70, 600000))
-        Harness.equal(grown.merging(probe).window(.sevenDay)?.usedPercent, 70, "a probe overrules the guard")
-        // A reading above everything seen since the credit is growth, not a repeat: stand down.
-        let above = grown.merging(snap(.statusline, at: 21000, fiveHour: nil, sevenDay: (71, 600000)))
-        Harness.equal(above.window(.sevenDay)?.usedPercent, 71, "a rising reading lifts the guard")
-        Harness.check(above.window(.sevenDay)?.echoGuard == nil, "and disarms it")
+        let unknown = held.merging(snap(.statusline, at: 90100, fiveHour: nil, sevenDay: (70, 600000)),
+                                   provenance: .stale(lastFreshAt: nil))
+        Harness.equal(unknown.window(.sevenDay)?.usedPercent, 0, "a writer of unknown age counts as pre-credit")
+        // A session that made a call after the credit and then went idle re-emits a post-credit number.
+        let after = held.merging(snap(.statusline, at: 90200, fiveHour: nil, sevenDay: (4, 600000)),
+                                 provenance: .stale(lastFreshAt: Date(timeIntervalSince1970: 2000)))
+        Harness.equal(after.window(.sevenDay)?.usedPercent, 4, "post-credit readings still count")
+        Harness.equal(after.window(.sevenDay)?.creditAt, Date(timeIntervalSince1970: 1060), "the credit is carried along")
+        // A probe is a live call, so 70 there would be the truth.
+        let probe = snap(.probe, at: 90300, fiveHour: nil, sevenDay: (70, 600000))
+        Harness.equal(after.merging(probe).window(.sevenDay)?.usedPercent, 70, "a probe overrules everything")
     }
 
-    /// Two sessions far enough apart look exactly like a credit at the instant of the drop. The
-    /// guard has to undo itself on the next reading rather than pin usage to the lower value.
-    static func mergeRecoversFromAMisreadDrop() {
-        let current = snap(.statusline, at: 1000, fiveHour: (45, 20000), sevenDay: nil)
-        let older = current.merging(snap(.statusline, at: 1060, fiveHour: (30, 20000), sevenDay: nil))
-        Harness.equal(older.window(.fiveHour)?.usedPercent, 30, "the drop is taken as a credit")
-        let real = older.merging(snap(.statusline, at: 1120, fiveHour: (47, 20000), sevenDay: nil))
-        Harness.equal(real.window(.fiveHour)?.usedPercent, 47, "the next, higher reading wins it back")
-        Harness.check(real.window(.fiveHour)?.echoGuard == nil, "and clears the guard")
+    static func mergeKeepsOneResetTimePerInstance() {
+        let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
+        let jittered = snap(.probe, at: 1060, fiveHour: nil, sevenDay: (72, 600001))
+        let merged = current.merging(jittered).window(.sevenDay)
+        Harness.equal(merged?.usedPercent, 72, "a second of jitter is the same instance")
+        Harness.equal(merged?.resetsAt, Date(timeIntervalSince1970: 600000), "and keeps its first resetsAt")
+    }
+
+    /// `durationMs` is taken at t = 0 and advances with `t`, as one process's wall time does.
+    private static func stamped(_ id: String, apiMs: Double, durationMs: Double = 10 * 3_600_000, at t: TimeInterval) -> UsageSnapshot {
+        var s = snap(.statusline, at: t, fiveHour: (30, 20000), sevenDay: nil)
+        s.session = SessionStamp(id: id, apiDurationMs: apiMs, durationMs: durationMs + t * 1000)
+        return s
+    }
+
+    static func statuslineParsesTheSessionStamp() {
+        let json = #"{"session_id":"abc","cost":{"total_api_duration_ms":9053422,"total_duration_ms":374791088},"rate_limits":{"seven_day":{"used_percentage":3,"resets_at":100}}}"#
+        let snap = try? StatuslineParser.parse(Data(json.utf8), observedAt: Date())
+        Harness.equal(snap?.session, SessionStamp(id: "abc", apiDurationMs: 9053422, durationMs: 374791088), "session stamp")
+        let bare = try? StatuslineParser.parse(Data(#"{"rate_limits":{"seven_day":{"used_percentage":3,"resets_at":100}}}"#.utf8), observedAt: Date())
+        Harness.check(bare?.session == nil, "no session fields → no stamp")
+    }
+
+    static func trackerTellsLiveReadingsFromReEmits() {
+        var tracker = SessionTracker()
+        Harness.equal(tracker.provenance(of: stamped("a", apiMs: 500, at: 1000)), .stale(lastFreshAt: nil),
+                      "an old session seen for the first time is of unknown age")
+        Harness.equal(tracker.provenance(of: stamped("a", apiMs: 500, at: 1060)), .stale(lastFreshAt: nil), "unchanged → re-emit")
+        Harness.equal(tracker.provenance(of: stamped("a", apiMs: 900, at: 1120)), .fresh, "API time grew → live")
+        Harness.equal(tracker.provenance(of: stamped("a", apiMs: 900, at: 1180)), .stale(lastFreshAt: Date(timeIntervalSince1970: 1120)),
+                      "a re-emit is as old as the last live reading")
+        Harness.equal(tracker.provenance(of: snap(.probe, at: 1200, fiveHour: nil, sevenDay: nil)), .fresh, "a probe is live")
+        Harness.equal(tracker.provenance(of: snap(.statusline, at: 1200, fiveHour: nil, sevenDay: nil)), .stale(lastFreshAt: nil),
+                      "no stamp → unknown")
+    }
+
+    static func trackerNeverTrustsAFirstSighting() {
+        var tracker = SessionTracker()
+        Harness.equal(tracker.provenance(of: stamped("new", apiMs: 800, durationMs: 90_000, at: 1000)), .stale(lastFreshAt: nil),
+                      "even a young writer may carry restored numbers")
+    }
+
+    /// Seen live: two terminals that resumed one session, alternating writes 2 s apart.
+    static func trackerSeparatesTwoProcessesOfOneSession() {
+        var tracker = SessionTracker()
+        var results: [Provenance] = []
+        for t in stride(from: 1000.0, through: 1300, by: 60) {
+            results.append(tracker.provenance(of: stamped("s", apiMs: 2_848_728, durationMs: 72_689_455, at: t)))
+            results.append(tracker.provenance(of: stamped("s", apiMs: 501_824, durationMs: 57_359_713, at: t + 2)))
+        }
+        Harness.check(!results.contains(.fresh), "alternating API totals of two processes are not growth")
+        let grown = tracker.provenance(of: stamped("s", apiMs: 502_000, durationMs: 57_359_713, at: 1402))
+        Harness.equal(grown, .fresh, "each process is fresh when its own total grows")
+    }
+
+    static func trackerForgetsOldSessions() {
+        var tracker = SessionTracker()
+        _ = tracker.provenance(of: stamped("old", apiMs: 1, at: 0))
+        _ = tracker.provenance(of: stamped("b", apiMs: 1, at: 9 * 86400))
+        Harness.equal(tracker.entries.map(\.sessionID), ["b"], "writers silent for over 8 days are dropped")
     }
 
     static func mergeLetsTheProbeOverrideAHeldValue() {
