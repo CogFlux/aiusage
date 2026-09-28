@@ -182,9 +182,12 @@ write without being able to date the numbers themselves:
 Each `UsageWindow` carries its own `observedAt` for this, since a merge can keep one window from the older
 snapshot and take the other from the newer one. Accepting a credit also arms an `EchoGuard` on the window:
 a session that has not made an API call since keeps re-emitting the pre-credit number, which reads as a
-rise and would be taken, so readings at or above that level (less `echoGuardMargin`, 2 points) are ignored
-for `echoGuardDuration` (30 min) — long enough for every session to refresh, short enough that usage
-genuinely climbing back there is not plausible. A probe clears the guard, being a live call.
+rise and would be taken. What marks it as an echo is not elapsed time — the stale session may stay open all
+day — but that it is *frozen*: readings at or above the pre-credit level (less `echoGuardMargin`, 2 points)
+are ignored while they stay at or below the highest already seen, and the guard lifts as soon as one comes
+in above it, which only a session genuinely burning quota produces. A probe clears it outright. The same
+rule undoes a misread: two sessions far enough apart look like a credit at the instant of the drop, and the
+next, higher reading wins it back.
 A re-pace checkpoint whose base is above
 the current usage is deleted, not just ignored: the amount it treats as sunk has come back, and usage later
 climbing past that base again must not revive a line anchored before the credit.

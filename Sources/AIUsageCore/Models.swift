@@ -55,15 +55,23 @@ public enum SnapshotSource: String, Codable, Sendable {
 
 /// A session that has not made an API call since a quota credit keeps re-emitting the pre-credit
 /// number. That reads as a rise, which the merge would normally take, so usage visibly jumps back.
-/// After accepting a credit the window carries this guard and ignores readings at or above the
-/// pre-credit level until it expires — real usage cannot climb back there that fast.
+///
+/// What separates an echo from a genuinely higher reading is not how long ago the credit was — the
+/// stale session may sit there all day — but that an echo is *frozen*: it repeats one value, while
+/// a session that is really burning quota reports a rising one. So the guard blocks suspect
+/// readings only while they stay at or below the highest already seen, and lifts the moment one
+/// comes in above it. That also undoes itself if the drop was never a credit at all (two sessions
+/// far enough apart look the same at the instant of the drop): the next reading is higher, and the
+/// guard is gone.
 public struct EchoGuard: Codable, Equatable, Sendable {
+    /// Usage was here before the credit, so readings from here up are suspect.
     public var above: Double
-    public var until: Date
+    /// The highest suspect reading so far. Anything above it is growth, not a repeat.
+    public var highestSeen: Double
 
-    public init(above: Double, until: Date) {
+    public init(above: Double, highestSeen: Double) {
         self.above = above
-        self.until = until
+        self.highestSeen = highestSeen
     }
 }
 
@@ -78,9 +86,6 @@ public struct MergePolicy: Equatable, Sendable {
     /// How far below the pre-credit reading the echo guard starts, so slightly older echoes are
     /// caught too.
     public var echoGuardMargin: Double = 2
-    /// How long the guard lasts — long enough for every session to have refreshed, short enough
-    /// that usage genuinely climbing back to the pre-credit level is not plausible.
-    public var echoGuardDuration: TimeInterval = 30 * 60
 
     public init() {}
 
@@ -94,17 +99,22 @@ public struct MergePolicy: Equatable, Sendable {
             taken.echoGuard = nil
             return taken
         }
-        if let guarded = current.echoGuard, now < guarded.until, incoming.usedPercent >= guarded.above {
+        var taken = incoming
+        taken.echoGuard = current.echoGuard
+
+        if let guarded = current.echoGuard, incoming.usedPercent >= guarded.above {
+            // Above everything seen since the credit: real growth, so believe it and stand down.
+            guard incoming.usedPercent <= guarded.highestSeen else {
+                taken.echoGuard = nil
+                return taken
+            }
             return current
         }
-
-        var taken = incoming
-        taken.echoGuard = current.echoGuard.flatMap { now < $0.until ? $0 : nil }
 
         let drop = current.usedPercent - incoming.usedPercent
         if drop >= genuineDropPoints {
             taken.echoGuard = EchoGuard(above: current.usedPercent - echoGuardMargin,
-                                        until: now.addingTimeInterval(echoGuardDuration))
+                                        highestSeen: current.usedPercent)
             return taken
         }
         // A smaller drop is more likely an idle session's older numbers; hold, but not forever.

@@ -132,8 +132,13 @@ struct MenuContentView: View {
                 Label(s.settings, systemImage: "gearshape")
             }
             .simultaneousGesture(TapGesture().onEnded {
-                // Accessory apps open Settings behind other windows unless activated.
-                NSApplication.shared.activate(ignoringOtherApps: true)
+                // Accessory apps open Settings behind other windows unless activated. The tap runs
+                // before SettingsLink creates the window, and activating an app with no window yet
+                // raises nothing, so activate again once it is there. Touching the window itself
+                // interferes with SwiftUI setting it up; activating the app does not.
+                let activate = { NSApplication.shared.activate(ignoringOtherApps: true) }
+                activate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: activate)
             })
             Spacer()
             Button(s.quit) {
