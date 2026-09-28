@@ -13,6 +13,8 @@ final class DeepSeekStore: ObservableObject {
         static let budgetEnabled = "deepseekBudgetEnabled"
         static let lowBalance = "deepseekLowBalance"
         static let notifyLowBalance = "deepseekNotifyLowBalance"
+        static let alertTracker = "deepseekAlertTracker"
+        static let lowBalanceFired = "deepseekLowBalanceFired"
     }
 
     static let windowID = "deepseek.month"
@@ -61,8 +63,16 @@ final class DeepSeekStore: ObservableObject {
     private let strings: () -> Strings
     private let locale: () -> Locale
     private var timer: Timer?
-    private var alertTracker = AlertTracker()
-    private var lowBalanceFired = false
+    /// Both persisted, so a relaunch does not repeat notifications that already fired.
+    private var alertTracker = AlertTracker() {
+        didSet {
+            guard alertTracker != oldValue else { return }
+            UserDefaults.standard.set(try? JSONEncoder().encode(alertTracker), forKey: Keys.alertTracker)
+        }
+    }
+    private var lowBalanceFired = false {
+        didSet { UserDefaults.standard.set(lowBalanceFired, forKey: Keys.lowBalanceFired) }
+    }
 
     init(notifier: Notifier, strings: @escaping () -> Strings, locale: @escaping () -> Locale) {
         self.notifier = notifier
@@ -75,6 +85,11 @@ final class DeepSeekStore: ObservableObject {
         lowBalanceThreshold = defaults.object(forKey: Keys.lowBalance) == nil ? 10 : defaults.double(forKey: Keys.lowBalance)
         notifyLowBalance = defaults.bool(forKey: Keys.notifyLowBalance)
         hasAPIKey = FileManager.default.fileExists(atPath: Self.keyFileURL.path)
+        lowBalanceFired = defaults.bool(forKey: Keys.lowBalanceFired)
+        if let data = defaults.data(forKey: Keys.alertTracker),
+           let remembered = try? JSONDecoder().decode(AlertTracker.self, from: data) {
+            alertTracker = remembered
+        }
         if let data = try? Data(contentsOf: Self.ledgerFileURL),
            let saved = try? JSONDecoder().decode(SpendLedger.self, from: data) {
             ledger = saved

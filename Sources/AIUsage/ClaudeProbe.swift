@@ -46,8 +46,11 @@ enum ClaudeProbe {
         "~/.claude/local/claude",
     ]
 
-    private static var loginShellCache: String??
+    /// Only a found path is cached: `claude` may be installed while the app is running.
+    private static var loginShellCache: String?
+    private static let cacheLock = NSLock()
 
+    /// May spawn a login shell, which can take a second or more: call it off the main thread.
     static func resolveClaudePath(override: String) -> String? {
         let fm = FileManager.default
         let trimmed = override.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -58,9 +61,11 @@ enum ClaudeProbe {
         if let found = candidatePaths.map(expand).first(where: { fm.isExecutableFile(atPath: $0) }) {
             return found
         }
-        if let cached = loginShellCache { return cached }
+        if let cached = cacheLock.withLock({ loginShellCache }), fm.isExecutableFile(atPath: cached) {
+            return cached
+        }
         let looked = loginShellLookup()
-        loginShellCache = .some(looked)
+        cacheLock.withLock { loginShellCache = looked }
         return looked
     }
 
@@ -127,29 +132,47 @@ enum ClaudeProbe {
         process.standardError = err
         // Without this, claude waits 3 s for piped stdin before proceeding.
         process.standardInput = FileHandle.nullDevice
-        try process.run()
 
-        var timedOut = false
+        // Read as output arrives rather than until EOF: a child that inherited the pipes can hold
+        // them open after claude itself has exited or been killed, and EOF would never come.
+        let outBuffer = ChunkBuffer(), errBuffer = ChunkBuffer()
+        let closed = DispatchGroup()
+        for (pipe, buffer) in [(out, outBuffer), (err, errBuffer)] {
+            closed.enter()
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if chunk.isEmpty {
+                    handle.readabilityHandler = nil
+                    closed.leave()
+                } else {
+                    buffer.append(chunk)
+                }
+            }
+        }
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        try process.run()
+        let started = Date()
+
+        // SIGTERM first, then SIGKILL for a process that ignores it.
         let killer = DispatchWorkItem {
-            if process.isRunning {
-                timedOut = true
-                process.terminate()
+            guard process.isRunning else { return }
+            process.terminate()
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             }
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-
-        // Drain stderr concurrently so a chatty stderr can't block stdout.
-        var errData = Data()
-        let group = DispatchGroup()
-        group.enter()
-        DispatchQueue.global().async {
-            errData = err.fileHandleForReading.readDataToEndOfFile()
-            group.leave()
-        }
-        let outData = out.fileHandleForReading.readDataToEndOfFile()
-        group.wait()
-        process.waitUntilExit()
+        exited.wait()
         killer.cancel()
+        let timedOut = process.terminationReason == .uncaughtSignal && Date().timeIntervalSince(started) >= timeout
+        // Whatever is still buffered in the pipes arrives within moments of the exit.
+        if closed.wait(timeout: .now() + 2) == .timedOut {
+            out.fileHandleForReading.readabilityHandler = nil
+            err.fileHandleForReading.readabilityHandler = nil
+        }
+        let outData = outBuffer.data
+        let errData = errBuffer.data
 
         let text = String(decoding: outData, as: UTF8.self)
         if let snap = ProbeParser.parse(streamJSON: text, observedAt: Date()) {
@@ -165,4 +188,13 @@ enum ClaudeProbe {
         }
         throw ProbeError.noRateLimitEvent
     }
+}
+
+/// Output collected from a pipe's readability handler, which runs on a background queue.
+private final class ChunkBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var collected = Data()
+
+    func append(_ chunk: Data) { lock.withLock { collected.append(chunk) } }
+    var data: Data { lock.withLock { collected } }
 }

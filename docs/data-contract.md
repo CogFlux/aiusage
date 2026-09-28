@@ -273,20 +273,26 @@ bar), and `Pace.checkpoint` echoes the checkpoint in effect. A checkpoint that c
 checkpoint to a window instance by its `resetsAt` (±120 s, since the two sources may differ by a second),
 so it expires with the window. Menu bar marker and alerts follow the re-paced numbers.
 - While `tooEarly`, `delta` is still computed and may be shown; only `projected` / `runout` are withheld.
-- Stale data: `now − observedAt > 30 min` is flagged stale (default; a UI-layer parameter).
+- Stale data: flagged when nothing has confirmed the numbers for 30 min (default; a UI-layer parameter), i.e.
+  since the last *fresh* reading — the probe, or a statusline write whose writer's API time grew. The snapshot's
+  own `observedAt` does not count: idle sessions refresh it every minute without new information. Quota spent
+  where the statusline cannot see it (claude.ai, the desktop app) is exactly what a stale flag hints at.
 
 ### Alerts
 
-`AlertTracker` is a pure state machine fed every snapshot and clock tick; it decides which of three
+`AlertTracker` is a pure state machine fed every snapshot and clock tick; it decides which
 alerts fire and dedupes them per window instance (`id` + `resetsAt`).
 
 | Alert | Fires when | Repeats |
 |---|---|---|
 | `overPace` | status enters `overPace` | Only after delta has dropped to `tolerance − rearmMargin` (margin 2, capped at tolerance ⁄ 2: 5h re-arms at +3, 7d at +1.5) **and** at least `overPaceCooldown` after the last one (5h: 1 h, 7d: 6 h, DeepSeek month: 24 h). A delta hovering on the threshold therefore alerts once. |
 | `runningOut` | `runoutAt` is before the reset and within `runningOutLead` (5h: 30 min, 7d: 12 h) | Once per instance |
-| `windowReset` | `now` passes the `resetsAt` of an instance that was being tracked | Once per instance |
+| `windowReset` | `now` passes the `resetsAt` of an instance that was being tracked, noticed within `windowResetLateLimit` (15 min) — a reset that happened while the app was not running stays quiet | Once per instance |
+| `quotaRestored` | usage in the same instance drops by `quotaRestoredDropPoints` (5) | Not within `quotaRestoredCooldown` (10 min) |
 
-`tooEarly` suppresses everything.
+`tooEarly` suppresses everything. The tracker is `Codable` and the app persists it (and DeepSeek's low-balance
+flag), so a relaunch — an update, a login — does not repeat what has already fired. State for instances more
+than a day past their reset is pruned.
 
 ## 4. Text rendering (menu bar title)
 

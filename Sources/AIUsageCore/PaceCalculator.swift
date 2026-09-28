@@ -23,7 +23,7 @@ public struct PaceConfig: Equatable, Sendable {
     public init() {}
 }
 
-public enum PaceStatus: String, Equatable, Sendable {
+public enum PaceStatus: String, Codable, Equatable, Sendable {
     /// `now` is past `resetsAt`; the window is over and the numbers no longer apply.
     case reset
     /// Window just started; delta is shown but no projection.
@@ -48,7 +48,7 @@ public struct PaceCheckpoint: Equatable, Sendable, Codable {
     }
 }
 
-public struct Pace: Equatable, Sendable {
+public struct Pace: Codable, Equatable, Sendable {
     public var usedPercent: Double
     /// 0...1, how far through the window we are.
     public var elapsedFraction: Double

@@ -28,6 +28,8 @@ final class UsageStore: ObservableObject {
         static let restorePoints = "paceRestorePoints"
         static let lastSnapshot = "lastSnapshot"
         static let sessionTracker = "sessionTracker"
+        static let alertTracker = "alertTracker"
+        static let lastLive = "lastLiveReading"
     }
 
     /// A user-set "re-pace from now" point, bound to one window instance by its `resetsAt` so it
@@ -52,6 +54,15 @@ final class UsageStore: ObservableObject {
     private var sessionTracker = SessionTracker() {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(sessionTracker), forKey: Keys.sessionTracker) }
     }
+    /// The last reading straight from an API response. Idle sessions rewrite the file every minute,
+    /// so the snapshot's own `observedAt` says nothing about how current the numbers are.
+    struct LiveReading: Codable, Equatable {
+        var source: SnapshotSource
+        var at: Date
+    }
+    @Published private(set) var lastLive: LiveReading? {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(lastLive), forKey: Keys.lastLive) }
+    }
     @Published private(set) var now = Date()
     @Published private(set) var probeState: ProbeState = .idle
     @Published private(set) var hookInstalled = false
@@ -60,8 +71,14 @@ final class UsageStore: ObservableObject {
     @Published private(set) var fileHasNoQuota = false
 
     @Published var claudePathOverride: String {
-        didSet { UserDefaults.standard.set(claudePathOverride, forKey: Keys.claudePath) }
+        didSet {
+            UserDefaults.standard.set(claudePathOverride, forKey: Keys.claudePath)
+            refreshClaudePath()
+        }
     }
+    /// Looked up in the background: finding `claude` may take a login shell.
+    @Published private(set) var resolvedClaudePath: String?
+    @Published private(set) var claudePathResolved = false
 
     @Published var menuBarKind: WindowKind {
         didSet { UserDefaults.standard.set(menuBarKind.rawValue, forKey: Keys.menuBarKind) }
@@ -119,6 +136,7 @@ final class UsageStore: ObservableObject {
         didSet { UserDefaults.standard.set(menuBarProvider.rawValue, forKey: Keys.menuBarProvider) }
     }
     var notificationsSupported: Bool { notifier.isSupported }
+    /// Persisted, so a relaunch does not repeat notifications that already fired.
     private var alertTracker = AlertTracker()
 
     @Published private(set) var storedCheckpoints: [WindowKind: StoredCheckpoint] = [:] {
@@ -181,10 +199,19 @@ final class UsageStore: ObservableObject {
            let remembered = try? JSONDecoder().decode(SessionTracker.self, from: data) {
             sessionTracker = remembered
         }
+        if let data = defaults.data(forKey: Keys.alertTracker),
+           let remembered = try? JSONDecoder().decode(AlertTracker.self, from: data) {
+            alertTracker = remembered
+        }
+        if let data = defaults.data(forKey: Keys.lastLive),
+           let remembered = try? JSONDecoder().decode(LiveReading?.self, from: data) {
+            lastLive = remembered
+        }
         storedCheckpoints = Self.loadPoints(forKey: Keys.checkpoints)
         restorePoints = Self.loadPoints(forKey: Keys.restorePoints)
 
         refreshHookState()
+        refreshClaudePath()
         reloadFromFile()
         startWatching()
 
@@ -244,8 +271,12 @@ final class UsageStore: ObservableObject {
     /// Runs on every new snapshot and every clock tick. The tracker dedupes; here we only filter
     /// by the user's toggles and hand the rest to the notifier.
     private func evaluateAlerts() {
+        let before = alertTracker
         let alerts = alertTracker.evaluate(snapshot: snapshot, now: now, paceConfig: config,
                                            checkpoints: activeCheckpoints)
+        if alertTracker != before {
+            UserDefaults.standard.set(try? JSONEncoder().encode(alertTracker), forKey: Keys.alertTracker)
+        }
         for alert in alerts {
             let enabled: Bool
             switch alert.kind {
@@ -321,9 +352,17 @@ final class UsageStore: ObservableObject {
         evaluateAlerts()
     }
 
+    /// When the numbers were last confirmed by an API response, and by which source. Falls back to
+    /// the snapshot itself before any live reading has been seen.
+    var confirmed: LiveReading? {
+        lastLive ?? snapshot.map { LiveReading(source: $0.source, at: $0.observedAt) }
+    }
+
+    /// Nothing has confirmed the numbers for a while. They may still be right — or quota was spent
+    /// where the statusline cannot see it (claude.ai, the desktop app).
     var isStale: Bool {
-        guard let snapshot else { return false }
-        return now.timeIntervalSince(snapshot.observedAt) > staleAfter
+        guard snapshot != nil, let confirmed else { return false }
+        return now.timeIntervalSince(confirmed.at) > staleAfter
     }
 
     /// We have data from Claude, but this window is currently absent: it ended and the next
@@ -337,12 +376,25 @@ final class UsageStore: ObservableObject {
                                     compact: compactMenuBar, idle: isIdle(menuBarKind))
     }
 
-    var resolvedClaudePath: String? {
-        ClaudeProbe.resolveClaudePath(override: claudePathOverride)
+    /// True when a `claude` executable is reachable (default locations, login-shell PATH, or the
+    /// override). Assumed until the lookup says otherwise, so the warning does not flash at launch.
+    var claudeCodeInstalled: Bool { !claudePathResolved || resolvedClaudePath != nil }
+
+    func refreshClaudePath() {
+        Task { _ = await lookUpClaudePath() }
     }
 
-    /// True when a `claude` executable is reachable (default locations, login-shell PATH, or the override).
-    var claudeCodeInstalled: Bool { resolvedClaudePath != nil }
+    private func lookUpClaudePath() async -> String? {
+        let override = claudePathOverride
+        let path = await Task.detached(priority: .userInitiated) {
+            ClaudeProbe.resolveClaudePath(override: override)
+        }.value
+        // A newer lookup for a changed override has taken over.
+        guard override == claudePathOverride else { return resolvedClaudePath }
+        resolvedClaudePath = path
+        claudePathResolved = true
+        return path
+    }
 
     static let claudeCodeInstallURL = URL(string: "https://code.claude.com/docs/en/quickstart")!
 
@@ -373,19 +425,22 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    /// Relative age of the current snapshot in the selected language, e.g. "3 minutes ago".
+    /// Relative age of the last confirmed reading in the selected language, e.g. "3 minutes ago".
     var snapshotAge: String? {
-        guard let snapshot else { return nil }
-        if now.timeIntervalSince(snapshot.observedAt) < 60 { return strings.justNow }
+        guard snapshot != nil, let confirmed else { return nil }
+        if now.timeIntervalSince(confirmed.at) < 60 { return strings.justNow }
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = locale
         formatter.unitsStyle = .short
-        return formatter.localizedString(for: snapshot.observedAt, relativeTo: now)
+        return formatter.localizedString(for: confirmed.at, relativeTo: now)
     }
 
     /// See `MergePolicy` for the rule; the tracker says whether `incoming` is a live reading.
     private func merge(_ incoming: UsageSnapshot) {
         let provenance = sessionTracker.provenance(of: incoming)
+        if provenance == .fresh {
+            lastLive = LiveReading(source: incoming.source, at: incoming.observedAt)
+        }
         let previous = snapshot
         snapshot = snapshot?.merging(incoming, provenance: provenance) ?? incoming
         now = Date()
@@ -411,14 +466,14 @@ final class UsageStore: ObservableObject {
 
     func probe() {
         guard probeState != .running else { return }
-        guard let path = resolvedClaudePath else {
-            let overrideSet = !claudePathOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            probeState = .failed(overrideSet ? strings.probeClaudePathInvalid : strings.probeClaudeNotInstalled)
-            return
-        }
         probeState = .running
         let env = HookInstaller.settingsEnv()
         Task {
+            guard let path = await lookUpClaudePath() else {
+                let overrideSet = !claudePathOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                probeState = .failed(overrideSet ? strings.probeClaudePathInvalid : strings.probeClaudeNotInstalled)
+                return
+            }
             do {
                 let snap = try await ClaudeProbe.run(claudePath: path, extraEnv: env)
                 merge(snap)

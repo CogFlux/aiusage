@@ -49,14 +49,18 @@ public struct AlertConfig: Equatable, Sendable {
     public var quotaRestoredDropPoints: Double = 5
     /// One credit can reach the merge twice (a session's write, then a probe); notify once.
     public var quotaRestoredCooldown: TimeInterval = 10 * 60
+    /// A reset noticed later than this (the app was not running when it happened) is old news.
+    public var windowResetLateLimit: TimeInterval = 15 * 60
     public init() {}
 }
 
 /// Decides which alerts fire as snapshots and time move forward, and remembers what has already
 /// fired so each condition notifies once per window instance. Pure state machine: feed it every
 /// new snapshot and every clock tick; the caller decides how to present the results.
-public struct AlertTracker: Equatable, Sendable {
-    private struct Instance: Equatable, Sendable {
+/// Codable so the caller can persist it: otherwise every relaunch (an update, a login) forgets
+/// what has fired and repeats it.
+public struct AlertTracker: Codable, Equatable, Sendable {
+    private struct Instance: Codable, Equatable, Sendable {
         var resetsAt: Date
         var pace: Pace
     }
@@ -98,7 +102,8 @@ public struct AlertTracker: Equatable, Sendable {
             // Reset: the instance we were tracking is over, whether or not it is still listed.
             if let previous = lastSeen[id], now >= previous.resetsAt {
                 let key = "reset|\(id)|\(previous.resetsAt.timeIntervalSince1970)"
-                if fired.insert(key).inserted {
+                if fired.insert(key).inserted,
+                   now.timeIntervalSince(previous.resetsAt) <= alertConfig.windowResetLateLimit {
                     alerts.append(UsageAlert(kind: .windowReset, windowID: id, resetsAt: previous.resetsAt, pace: previous.pace))
                 }
                 lastSeen[id] = nil
@@ -141,6 +146,20 @@ public struct AlertTracker: Equatable, Sendable {
                 }
             }
         }
+        prune(before: now.addingTimeInterval(-86400))
         return alerts
+    }
+
+    /// Every key ends in its instance's reset time. Drop the ones for instances long over, so the
+    /// state stays small however long the app runs.
+    private mutating func prune(before cutoff: Date) {
+        func live(_ key: String) -> Bool {
+            guard let t = key.split(separator: "|").last.flatMap({ Double($0) }) else { return true }
+            return Date(timeIntervalSince1970: t) >= cutoff
+        }
+        fired = fired.filter(live)
+        overPaceFiredAt = overPaceFiredAt.filter { live($0.key) }
+        overPaceDisarmed = overPaceDisarmed.filter(live)
+        quotaRestoredAt = quotaRestoredAt.filter { live($0.key) }
     }
 }

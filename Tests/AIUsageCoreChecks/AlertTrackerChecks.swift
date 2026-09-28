@@ -17,6 +17,38 @@ enum AlertTrackerChecks {
         overPaceHoveringOnTheThresholdFiresOnce()
         overPaceCooldownSpacesRepeats()
         quotaRestoredFiresOnASharpDropInsideALiveWindow()
+        stateSurvivesARelaunch()
+        aResetNoticedLateStaysQuiet()
+        oldInstancesArePruned()
+    }
+
+    /// The app is relaunched (an update, a login) while still over pace: no second notification.
+    static func stateSurvivesARelaunch() {
+        var tracker = AlertTracker()
+        Harness.equal(tracker.evaluate(snapshot: snap(45.2, at: 7200), now: at(7200)).map(\.kind), [.overPace], "fires once")
+        guard let data = try? JSONEncoder().encode(tracker),
+              var restored = try? JSONDecoder().decode(AlertTracker.self, from: data) else {
+            Harness.check(false, "tracker round-trips through JSON"); return
+        }
+        Harness.equal(restored, tracker, "round-trip is lossless")
+        Harness.check(restored.evaluate(snapshot: snap(46, at: 7300), now: at(7300)).isEmpty, "a relaunch does not repeat it")
+    }
+
+    /// The window reset while the app was not running; on the next launch that is old news.
+    static func aResetNoticedLateStaysQuiet() {
+        var tracker = AlertTracker()
+        _ = tracker.evaluate(snapshot: snap(30, at: 9000), now: at(9000))
+        let alerts = tracker.evaluate(snapshot: snap(30, at: 9000), now: at(18000 + 3600))
+        Harness.check(alerts.isEmpty, "a reset an hour ago does not notify")
+    }
+
+    static func oldInstancesArePruned() {
+        var tracker = AlertTracker()
+        _ = tracker.evaluate(snapshot: snap(45.2, at: 7200), now: at(7200))
+        let before = (try? JSONEncoder().encode(tracker))?.count ?? 0
+        _ = tracker.evaluate(snapshot: nil, now: at(18000 + 2 * 86400))
+        let after = (try? JSONEncoder().encode(tracker))?.count ?? 0
+        Harness.check(after < before, "state for an instance two days over is dropped")
     }
 
     static func quotaRestoredFiresOnASharpDropInsideALiveWindow() {

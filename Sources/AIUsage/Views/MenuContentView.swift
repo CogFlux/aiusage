@@ -49,15 +49,19 @@ struct MenuContentView: View {
         }
         .padding(14)
         .frame(width: 360)
-        .onAppear { deepseek.tick() }
+        .onAppear {
+            deepseek.tick()
+            // Picks up a `claude` installed since the last look.
+            if store.resolvedClaudePath == nil { store.refreshClaudePath() }
+        }
     }
 
     private var header: some View {
         HStack {
             Text("Claude").font(.title3.bold())
             Spacer()
-            if let snap = store.snapshot, let age = store.snapshotAge {
-                Text(sourceLabel(snap.source) + " · " + age)
+            if let confirmed = store.confirmed, let age = store.snapshotAge {
+                Text(sourceLabel(confirmed.source) + " · " + age)
                     .font(.caption)
                     .foregroundStyle(store.isStale ? .orange : .secondary)
             } else {
