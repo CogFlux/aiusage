@@ -192,7 +192,7 @@ of the window. So a detected credit rebases the even-pace line itself: the budge
 reuses `PaceCheckpoint` (origin = the credit, base = usage just after it, so a partial credit works too),
 but it is a correction rather than a user setting — the popover shows none of the re-pace caption, Clear
 button or extra ticks for it, and only a checkpoint the user set by hand does. A hand-set checkpoint takes
-precedence over the credit's. The `quotaRestored` alert (`AlertConfig.quotaRestoredDropPoints`, the same
+precedence over the credit's, and clearing it falls back to the credit's rather than to the pre-credit line. The `quotaRestored` alert (`AlertConfig.quotaRestoredDropPoints`, the same
 10 points; `quotaRestoredCooldown` suppresses an echo from a session that has not refreshed) notifies,
 since no `windowReset` can fire here.
 

@@ -289,14 +289,16 @@ final class UsageStore: ObservableObject {
         guard let window = snapshot?.window(kind), canRepace(kind) else { return }
         storedCheckpoints[kind] = StoredCheckpoint(resetsAt: window.resetsAt,
                                                    checkpoint: PaceCheckpoint(at: now, usedPercent: window.usedPercent))
-        restorePoints[kind] = nil
+        // The credit's own origin stays on file: precedence hides it while this one exists, and
+        // clearing this one must fall back to it rather than to the pre-credit line.
         evaluateAlerts()
     }
 
-    /// Clears whichever origin is in effect, back to the plain line from the window start.
+    /// Undoes the user's own re-pace. A quota credit's rebase is a correction to the line rather
+    /// than a choice, so it is not cleared here — the budget falls back to it, not to the line
+    /// from the window start that the credit made wrong.
     func clearCheckpoint(_ kind: WindowKind) {
         storedCheckpoints[kind] = nil
-        restorePoints[kind] = nil
         evaluateAlerts()
     }
 
