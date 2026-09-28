@@ -165,9 +165,11 @@ re-emits its last-known numbers every `refreshInterval` with a fresh mtime. Its 
 session's last API response, so the newest write is not the newest truth. Consequently `observedAt` means
 "last time any source reported", not "last API response".
 
-A lower reading is therefore usually an older one — but not always: a quota reset credit lowers usage
-inside a live window (same `resetsAt`). `MergePolicy` separates the two cases without being able to date
-the numbers themselves:
+A lower reading is therefore usually an older one — but not always. **A quota reset credit zeroes
+`used_percentage` and leaves `resets_at` untouched** (confirmed 2026-09-28): the quota comes back, the
+clock does not, so the restored allowance has only the remainder of the window to be spent in. Since the
+window instance is unchanged, the drop is the only evidence, and `MergePolicy` separates it from a stale
+write without being able to date the numbers themselves:
 
 | Incoming | Result |
 |---|---|
@@ -182,6 +184,11 @@ snapshot and take the other from the newer one. Residual: right after a credit, 
 made an API call can re-emit the pre-credit number, which reads as an increase and is taken; the next fresh
 write corrects it, and "Query now" is authoritative at any moment. A re-pace checkpoint whose base is above
 the current usage is dropped, since the amount it treats as sunk no longer is.
+
+Pace after a credit needs no special case: `budget` still counts from the window start, so usage of 0% at
+85% elapsed reads as `▼85` — correct, and the sign the allowance now exceeds what the remaining time can
+spend. "Re-pace from now" narrows it back to a meaningful line (origin = the credit, target = 99% at the
+unchanged reset) for anyone who wants one.
 
 ## 3. Pace calculation
 
