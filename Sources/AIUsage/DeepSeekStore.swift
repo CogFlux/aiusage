@@ -28,6 +28,11 @@ final class DeepSeekStore: ObservableObject {
         }
     }
     @Published private(set) var hasAPIKey: Bool
+    /// Settings-window scratch state. It lives here rather than in the view because SwiftUI's
+    /// `@State` is a macro in the macOS 27 SDK and the Command Line Tools ship no plugin to
+    /// expand it; `@EnvironmentObject` + `@Published` need none.
+    @Published var apiKeyDraft = ""
+    @Published private(set) var apiKeyJustSaved = false
     /// Monthly spend budget in the account's currency. Only paced while `budgetEnabled` is on, so
     /// the amount survives toggling the budget off and on.
     @Published var monthlyBudget: Double {
@@ -78,6 +83,18 @@ final class DeepSeekStore: ObservableObject {
     }
 
     // MARK: API key (0600 file; see docs/data-contract.md for why not Keychain yet)
+
+    /// Save what was typed into the settings field, then confirm for a few seconds.
+    func saveTypedAPIKey() {
+        guard !apiKeyDraft.isEmpty else { return }
+        saveAPIKey(apiKeyDraft)
+        apiKeyDraft = ""
+        apiKeyJustSaved = true
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.apiKeyJustSaved = false
+        }
+    }
 
     func saveAPIKey(_ key: String) {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)

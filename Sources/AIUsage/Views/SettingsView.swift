@@ -5,8 +5,6 @@ struct SettingsView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var updater: Updater
-    @State private var apiKeyDraft = ""
-    @State private var apiKeyJustSaved = false
 
     private var s: Strings { store.strings }
 
@@ -116,14 +114,14 @@ struct SettingsView: View {
 
             Section {
                 HStack {
-                    SecureField(s.deepseekAPIKey, text: $apiKeyDraft,
+                    SecureField(s.deepseekAPIKey, text: $deepseek.apiKeyDraft,
                                 prompt: Text(deepseek.hasAPIKey ? "••••••••" : "sk-…"))
-                        .onSubmit(saveKey)
-                    Button(s.deepseekSave, action: saveKey).disabled(apiKeyDraft.isEmpty)
+                        .onSubmit(deepseek.saveTypedAPIKey)
+                    Button(s.deepseekSave, action: deepseek.saveTypedAPIKey).disabled(deepseek.apiKeyDraft.isEmpty)
                 }
                 HStack {
-                    Text(apiKeyJustSaved ? s.deepseekAPIKeySaved : s.deepseekAPIKeyHint)
-                        .font(.caption).foregroundStyle(apiKeyJustSaved ? .green : .secondary)
+                    Text(deepseek.apiKeyJustSaved ? s.deepseekAPIKeySaved : s.deepseekAPIKeyHint)
+                        .font(.caption).foregroundStyle(deepseek.apiKeyJustSaved ? .green : .secondary)
                     Spacer()
                     Button(s.deepseekRefresh) { deepseek.refresh() }
                         .disabled(!deepseek.hasAPIKey || deepseek.isRefreshing)
@@ -151,17 +149,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-    }
-
-    private func saveKey() {
-        guard !apiKeyDraft.isEmpty else { return }
-        deepseek.saveAPIKey(apiKeyDraft)
-        apiKeyDraft = ""
-        apiKeyJustSaved = true
-        Task {
-            try? await Task.sleep(for: .seconds(3))
-            apiKeyJustSaved = false
-        }
     }
 
     private var claudeCodeTab: some View {

@@ -15,18 +15,6 @@ SU_FEED_URL="${SU_FEED_URL:-https://aiusage.cogflux.io/appcast.xml}"
 SU_PUBLIC_KEY="${SU_PUBLIC_KEY:-$(cat sparkle-public-key.txt 2>/dev/null || true)}"
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 
-# SwiftUI's property wrappers became macros in the macOS 27 SDK, and the Command Line Tools ship
-# no SwiftUI macro plugin (only Observation, Testing and the stdlib ones), so `@State` fails to
-# expand with "plugin for module 'SwiftUIMacros' not found". Until that plugin ships outside
-# Xcode, build against the newest installed SDK that still predates the change. Override with
-# SDKROOT=... to force a specific one.
-if [ -z "${SDKROOT:-}" ] && [ ! -e /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib ]; then
-  for sdk in /Library/Developer/CommandLineTools/SDKs/MacOSX26*.sdk; do
-    [ -d "$sdk" ] && SDKROOT="$sdk"
-  done
-  [ -n "${SDKROOT:-}" ] && export SDKROOT && echo "building against $SDKROOT (no SwiftUI macro plugin in the CLT)"
-fi
-
 if [ "${1:-}" = "--universal" ]; then
   swift build -c release --triple arm64-apple-macosx14.0
   swift build -c release --triple x86_64-apple-macosx14.0
