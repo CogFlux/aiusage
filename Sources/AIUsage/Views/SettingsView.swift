@@ -1,7 +1,30 @@
 import AIUsageCore
 import SwiftUI
 
+/// One page of the Settings window. The tabs themselves are the window's toolbar, which
+/// `SettingsPresenter` builds, the way macOS settings windows look.
 struct SettingsView: View {
+    enum Tab: CaseIterable {
+        case general, claudeCode, deepseek
+
+        func title(_ s: Strings) -> String {
+            switch self {
+            case .general: return s.general
+            case .claudeCode: return s.claudeCode
+            case .deepseek: return "DeepSeek"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .general: return "gearshape"
+            case .claudeCode: return "terminal"
+            case .deepseek: return "creditcard"
+            }
+        }
+    }
+
+    let tab: Tab
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var updater: Updater
@@ -9,16 +32,14 @@ struct SettingsView: View {
     private var s: Strings { store.strings }
 
     var body: some View {
-        TabView {
-            generalTab
-                .tabItem { Label(s.general, systemImage: "gearshape") }
-            claudeCodeTab
-                .tabItem { Label(s.claudeCode, systemImage: "terminal") }
-            deepseekTab
-                .tabItem { Label("DeepSeek", systemImage: "creditcard") }
+        Group {
+            switch tab {
+            case .general: generalTab
+            case .claudeCode: claudeCodeTab
+            case .deepseek: deepseekTab
+            }
         }
         .frame(width: 460)
-        .padding(.bottom, 4)
     }
 
     private var generalTab: some View {

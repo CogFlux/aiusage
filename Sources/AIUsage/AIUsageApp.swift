@@ -24,8 +24,8 @@ struct AIUsageApp: App {
         _deepseek = StateObject(wrappedValue: deepseek)
         let updater = Updater()
         _updater = StateObject(wrappedValue: updater)
-        SettingsPresenter.configure(onOpen: { store.refreshNotificationStatus() }) {
-            SettingsView()
+        SettingsPresenter.configure(onOpen: { store.refreshNotificationStatus() }) { tab in
+            SettingsView(tab: tab)
                 .environmentObject(store)
                 .environmentObject(deepseek)
                 .environmentObject(updater)

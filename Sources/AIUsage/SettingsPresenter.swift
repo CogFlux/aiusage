@@ -11,21 +11,23 @@ import SwiftUI
 @MainActor
 enum SettingsPresenter {
     private static var window: NSWindow?
-    private static var makeContent: (() -> AnyView)?
+    private static var makeContent: ((SettingsView.Tab) -> AnyView)?
     private static var onOpen: (() -> Void)?
+    private static var tabs: NSTabViewController?
 
-    /// Called once at launch with the view to host, environment objects already attached.
+    /// Called once at launch with the page for each tab, environment objects already attached.
     /// `onOpen` runs on every open: the window is kept between opens, so `onAppear` fires only once.
-    static func configure<Content: View>(onOpen: (() -> Void)? = nil, _ content: @escaping () -> Content) {
+    static func configure<Content: View>(onOpen: (() -> Void)? = nil,
+                                         _ content: @escaping (SettingsView.Tab) -> Content) {
         self.onOpen = onOpen
-        makeContent = { AnyView(content()) }
+        makeContent = { AnyView(content($0)) }
     }
 
     static func open() {
         guard let window = window ?? makeWindow() else { return }
         onOpen?()
-        // The language can change while the window is closed; the view follows on its own.
-        window.title = Strings.current.settings
+        // The language can change while the window is closed; the pages follow on their own.
+        relabel()
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         // Unlike the call above, this does not wait for the app to be active.
@@ -42,16 +44,41 @@ enum SettingsPresenter {
 
     private static func makeWindow() -> NSWindow? {
         guard let makeContent else { return nil }
-        let hosting = NSHostingController(rootView: makeContent())
-        hosting.sizingOptions = [.preferredContentSize]
-        let window = NSWindow(contentViewController: hosting)
+        let tabs = NSTabViewController()
+        tabs.tabStyle = .toolbar
+        for tab in SettingsView.Tab.allCases {
+            let page = NSHostingController(rootView: makeContent(tab))
+            // The window takes each page's height as its tab is selected.
+            page.sizingOptions = [.preferredContentSize]
+            let item = NSTabViewItem(viewController: page)
+            item.image = NSImage(systemSymbolName: tab.symbol, accessibilityDescription: nil)
+            tabs.addTabViewItem(item)
+        }
+        let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable, .miniaturizable]
+        window.toolbarStyle = .preference
         // Kept after closing so reopening is instant and remembers the selected tab.
         window.isReleasedWhenClosed = false
+        self.tabs = tabs
+        self.window = window
+        relabel()
         window.center()
         // Restores the last position when there is one.
         window.setFrameAutosaveName("AIUsageSettings")
-        self.window = window
         return window
+    }
+
+    /// Tab labels, and page titles, which the tab controller shows as the window title.
+    private static func relabel() {
+        guard let tabs else { return }
+        for (item, tab) in zip(tabs.tabViewItems, SettingsView.Tab.allCases) {
+            item.label = tab.title(Strings.current)
+            item.viewController?.title = item.label
+        }
+        // The controller only passes a title up when the selection changes.
+        let selected = tabs.selectedTabViewItemIndex
+        if tabs.tabViewItems.indices.contains(selected) {
+            window?.title = tabs.tabViewItems[selected].label
+        }
     }
 }
