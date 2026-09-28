@@ -26,6 +26,7 @@ final class UsageStore: ObservableObject {
         static let menuBarProvider = "menuBarProvider"
         static let checkpoints = "paceCheckpoints"
         static let restorePoints = "paceRestorePoints"
+        static let lastSnapshot = "lastSnapshot"
     }
 
     /// A user-set "re-pace from now" point, bound to one window instance by its `resetsAt` so it
@@ -40,7 +41,12 @@ final class UsageStore: ObservableObject {
         case deepseek
     }
 
-    @Published private(set) var snapshot: UsageSnapshot?
+    /// Persisted, so a restart does not begin by believing whichever session happened to write the
+    /// statusline file last. Without it the merge has no history to judge that file against — and
+    /// after a quota credit the file may well hold a stale session's pre-credit number.
+    @Published private(set) var snapshot: UsageSnapshot? {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(snapshot), forKey: Keys.lastSnapshot) }
+    }
     @Published private(set) var now = Date()
     @Published private(set) var probeState: ProbeState = .idle
     @Published private(set) var hookInstalled = false
@@ -162,6 +168,10 @@ final class UsageStore: ObservableObject {
         notifyQuotaRestored = defaults.bool(forKey: Keys.notifyQuotaRestored)
         launchAtLogin = LoginItem.isEnabled
         Strings.current = Strings.forLanguage(storedLanguage.resolved)
+        if let data = defaults.data(forKey: Keys.lastSnapshot),
+           let remembered = try? JSONDecoder().decode(UsageSnapshot?.self, from: data) {
+            snapshot = remembered
+        }
         storedCheckpoints = Self.loadPoints(forKey: Keys.checkpoints)
         restorePoints = Self.loadPoints(forKey: Keys.restorePoints)
 

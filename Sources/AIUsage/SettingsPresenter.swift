@@ -19,7 +19,7 @@ enum SettingsPresenter {
     /// sends anyway, and sending it directly leaves the ordering in our hands.
     static func open() {
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        activate()
         observeWindowCloses()
         if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
             NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
@@ -31,8 +31,16 @@ enum SettingsPresenter {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { raise() }
     }
 
+    /// `activate(ignoringOtherApps:)` has been deprecated since macOS 14 and is now a no-op here:
+    /// the app went regular but stayed in the background. The current API grants activation off
+    /// the back of the click the user just made.
+    private static func activate() {
+        NSApp.activate()
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
+    }
+
     private static func raise() {
-        NSApp.activate(ignoringOtherApps: true)
+        activate()
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.styleMask.contains(.titled) })
         else { return }
         // Unlike orderFront, this one does not wait for the app to be active.
@@ -45,8 +53,10 @@ enum SettingsPresenter {
         observer = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: nil, queue: .main
         ) { _ in
-            // The window is still listed during willClose; look again once it is gone.
-            Task { @MainActor in restoreIfNothingLeftOpen() }
+            // The window is still listed, and still visible, while it is closing; look afterwards.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                MainActor.assumeIsolated { restoreIfNothingLeftOpen() }
+            }
         }
     }
 
