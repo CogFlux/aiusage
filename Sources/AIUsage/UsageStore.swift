@@ -237,6 +237,9 @@ final class UsageStore: ObservableObject {
     func checkpoint(for kind: WindowKind) -> PaceCheckpoint? {
         guard let stored = storedCheckpoints[kind], let window = snapshot?.window(kind),
               abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120 else { return nil }
+        // Usage fell below the point we re-paced from — a quota reset credit, say. The sunk
+        // amount the checkpoint assumes is no longer sunk, so the checkpoint means nothing.
+        guard window.usedPercent >= stored.checkpoint.usedPercent else { return nil }
         return stored.checkpoint
     }
 

@@ -34,13 +34,45 @@ enum ParserChecks {
         mergeTakesNewerWindowInstance()
         mergeIgnoresOlderObservation()
         mergeDropsExpiredWindowMissingFromIncoming()
+        mergeAcceptsLargeDropAsGenuine()
+        mergeReleasesASmallDropAfterMaxHold()
+        mergeLetsTheProbeOverrideAHeldValue()
     }
 
     private static func snap(_ source: SnapshotSource, at t: TimeInterval, fiveHour: (Double, TimeInterval)?, sevenDay: (Double, TimeInterval)?) -> UsageSnapshot {
+        let at = Date(timeIntervalSince1970: t)
         var windows: [UsageWindow] = []
-        if let (u, r) = fiveHour { windows.append(UsageWindow(kind: .fiveHour, usedPercent: u, resetsAt: Date(timeIntervalSince1970: r))) }
-        if let (u, r) = sevenDay { windows.append(UsageWindow(kind: .sevenDay, usedPercent: u, resetsAt: Date(timeIntervalSince1970: r))) }
-        return UsageSnapshot(source: source, observedAt: Date(timeIntervalSince1970: t), windows: windows)
+        if let (u, r) = fiveHour {
+            windows.append(UsageWindow(kind: .fiveHour, usedPercent: u, resetsAt: Date(timeIntervalSince1970: r), observedAt: at))
+        }
+        if let (u, r) = sevenDay {
+            windows.append(UsageWindow(kind: .sevenDay, usedPercent: u, resetsAt: Date(timeIntervalSince1970: r), observedAt: at))
+        }
+        return UsageSnapshot(source: source, observedAt: at, windows: windows)
+    }
+
+    /// A quota reset credit lowers usage inside a live window (same `resetsAt`), which the
+    /// stale-write rule used to swallow.
+    static func mergeAcceptsLargeDropAsGenuine() {
+        let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
+        let credited = snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (0, 600000))
+        Harness.equal(current.merging(credited).window(.sevenDay)?.usedPercent, 0, "a big drop is taken at once")
+    }
+
+    static func mergeReleasesASmallDropAfterMaxHold() {
+        let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
+        // 5 points is within stale-write range, so it is held...
+        let soon = snap(.statusline, at: 1300, fiveHour: nil, sevenDay: (65, 600000))
+        Harness.equal(current.merging(soon).window(.sevenDay)?.usedPercent, 70, "small drop held while fresh")
+        // ...but not forever: past maxHold the newest reading wins.
+        let later = snap(.statusline, at: 1000 + 601, fiveHour: nil, sevenDay: (65, 600000))
+        Harness.equal(current.merging(later).window(.sevenDay)?.usedPercent, 65, "small drop accepted after maxHold")
+    }
+
+    static func mergeLetsTheProbeOverrideAHeldValue() {
+        let current = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
+        let probe = snap(.probe, at: 1060, fiveHour: nil, sevenDay: (65, 600000))
+        Harness.equal(current.merging(probe).window(.sevenDay)?.usedPercent, 65, "a probe is a live call, never stale")
     }
 
     static func mergeKeepsHigherUsageWithinSameWindow() {

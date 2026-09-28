@@ -18,7 +18,7 @@ public enum ProbeParser {
                       let utilization = JSONNumber.double(w["utilization"]),
                       let resets = JSONNumber.double(w["resetsAt"]) else { continue }
                 windows.append(UsageWindow(kind: kind, usedPercent: utilization * 100,
-                                           resetsAt: Date(timeIntervalSince1970: resets)))
+                                           resetsAt: Date(timeIntervalSince1970: resets), observedAt: observedAt))
             }
             if !windows.isEmpty {
                 return UsageSnapshot(source: .probe, observedAt: observedAt, windows: windows)

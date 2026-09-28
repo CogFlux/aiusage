@@ -165,6 +165,24 @@ re-emits its last-known numbers every `refreshInterval` with a fresh mtime. Its 
 session's last API response, so the newest write is not the newest truth. Consequently `observedAt` means
 "last time any source reported", not "last API response".
 
+A lower reading is therefore usually an older one — but not always: a quota reset credit lowers usage
+inside a live window (same `resetsAt`). `MergePolicy` separates the two cases without being able to date
+the numbers themselves:
+
+| Incoming | Result |
+|---|---|
+| Higher usage, or a different `resetsAt` | Taken |
+| From the probe | Taken — a probe is a live API round-trip, never stale |
+| Lower by ≥ `genuineDropPoints` (10) | Taken — an idle session's numbers do not trail that far |
+| Lower by less, within `maxHold` (10 min) of the held reading | Held |
+| Lower by less, older than `maxHold` | Taken |
+
+Each `UsageWindow` carries its own `observedAt` for this, since a merge can keep one window from the older
+snapshot and take the other from the newer one. Residual: right after a credit, a session that has not yet
+made an API call can re-emit the pre-credit number, which reads as an increase and is taken; the next fresh
+write corrects it, and "Query now" is authoritative at any moment. A re-pace checkpoint whose base is above
+the current usage is dropped, since the amount it treats as sunk no longer is.
+
 ## 3. Pace calculation
 
 Parameters (`PaceConfig`, defaults):

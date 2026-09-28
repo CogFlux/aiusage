@@ -18,7 +18,8 @@ public enum StatuslineParser {
             guard let w = rateLimits[kind.rawValue] as? [String: Any],
                   let used = JSONNumber.double(w["used_percentage"]),
                   let resets = JSONNumber.double(w["resets_at"]) else { continue }
-            windows.append(UsageWindow(kind: kind, usedPercent: used, resetsAt: Date(timeIntervalSince1970: resets)))
+            windows.append(UsageWindow(kind: kind, usedPercent: used,
+                                       resetsAt: Date(timeIntervalSince1970: resets), observedAt: observedAt))
         }
         guard !windows.isEmpty else { return nil }
         return UsageSnapshot(source: .statusline, observedAt: observedAt, windows: windows)
