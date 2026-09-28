@@ -5,7 +5,7 @@ import SwiftUI
 struct AIUsageApp: App {
     @StateObject private var store: UsageStore
     @StateObject private var deepseek: DeepSeekStore
-    @StateObject private var updater = Updater()
+    @StateObject private var updater: Updater
 
     init() {
         // Debug entry point: `AIUsage --probe` runs one active query, prints the
@@ -20,9 +20,16 @@ struct AIUsageApp: App {
         let notifier = Notifier()
         let store = UsageStore(notifier: notifier)
         _store = StateObject(wrappedValue: store)
-        _deepseek = StateObject(wrappedValue: DeepSeekStore(notifier: notifier,
-                                                            strings: { store.strings },
-                                                            locale: { store.locale }))
+        let deepseek = DeepSeekStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
+        _deepseek = StateObject(wrappedValue: deepseek)
+        let updater = Updater()
+        _updater = StateObject(wrappedValue: updater)
+        SettingsPresenter.configure(onOpen: { store.refreshNotificationStatus() }) {
+            SettingsView()
+                .environmentObject(store)
+                .environmentObject(deepseek)
+                .environmentObject(updater)
+        }
     }
 
     private var menuBarTitle: String {
@@ -77,12 +84,5 @@ struct AIUsageApp: App {
                 .monospacedDigit()
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView()
-                .environmentObject(store)
-                .environmentObject(deepseek)
-                .environmentObject(updater)
-        }
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuContentView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
+    @Environment(\.dismiss) private var dismiss
 
     private var s: Strings { store.strings }
 
@@ -129,7 +130,11 @@ struct MenuContentView: View {
     private var footer: some View {
         HStack {
             Button {
-                SettingsPresenter.open()
+                // Opening a window of this same app does not dismiss the panel, and closing it
+                // behind SwiftUI's back leaves it believing the panel is still up. The dismissal
+                // lands on whatever is key when it runs, so open Settings only once it is done.
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { SettingsPresenter.open() }
             } label: {
                 Label(s.settings, systemImage: "gearshape")
             }

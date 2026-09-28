@@ -19,7 +19,6 @@ struct SettingsView: View {
         }
         .frame(width: 460)
         .padding(.bottom, 4)
-        .onAppear { store.refreshNotificationStatus() }
     }
 
     private var generalTab: some View {
