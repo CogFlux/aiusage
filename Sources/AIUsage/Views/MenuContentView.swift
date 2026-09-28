@@ -128,10 +128,11 @@ struct MenuContentView: View {
 
     private var footer: some View {
         HStack {
-            SettingsLink {
+            Button {
+                SettingsPresenter.open()
+            } label: {
                 Label(s.settings, systemImage: "gearshape")
             }
-            .simultaneousGesture(TapGesture().onEnded { SettingsPresenter.willOpen() })
             Spacer()
             Button(s.quit) {
                 NSApplication.shared.terminate(nil)

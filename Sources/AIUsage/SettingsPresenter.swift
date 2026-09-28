@@ -13,15 +13,21 @@ import AppKit
 enum SettingsPresenter {
     private static var observer: NSObjectProtocol?
 
-    /// Call when the user asks for Settings, before or as the window is created.
-    static func willOpen() {
+    /// Opens Settings and brings it forward. Driven from a plain Button action rather than
+    /// SwiftUI's `SettingsLink`: a gesture attached alongside that link is not reliably delivered,
+    /// so the work here would silently never run. `showSettingsWindow:` is the action the link
+    /// sends anyway, and sending it directly leaves the ordering in our hands.
+    static func open() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         observeWindowCloses()
-        // Two things have to finish before the window can be raised: the popover dismisses (which
-        // hands focus back to whatever was in front), and SettingsLink creates the window — or,
-        // when it already exists, merely reorders it inside this app, which is invisible while the
-        // app is not the active one. Both are settled a moment later.
+        if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
+        // Two things have to finish before the window can be raised: the popover dismisses, which
+        // hands focus back to whatever was in front, and the window is created — or, when it
+        // already exists, merely reordered inside this app, which shows nothing while the app is
+        // not the active one. Both are settled a moment later.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { raise() }
     }
 
