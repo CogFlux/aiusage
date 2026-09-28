@@ -114,10 +114,11 @@ final class UsageStore: ObservableObject {
         didSet { persist(storedCheckpoints, forKey: Keys.checkpoints) }
     }
 
-    /// Where a quota reset credit landed, per window. Used as the pace origin when the user has
-    /// not set one of their own: after a credit the even-pace line from the window start says
-    /// only "far under budget" forever, while the restored quota really does have just the rest
-    /// of the window to be spent in.
+    /// Where a quota reset credit landed, per window. The even-pace line is rebased onto it, so
+    /// the default budget runs from the credit to 99% at the unchanged reset — what the restored
+    /// quota actually has to be spent in — rather than reading "far under budget" until the window
+    /// ends. This is a correction to the line, not a user setting: the UI shows no re-pace state
+    /// for it. A checkpoint the user set by hand still wins.
     @Published private(set) var restorePoints: [WindowKind: StoredCheckpoint] = [:] {
         didSet { persist(restorePoints, forKey: Keys.restorePoints) }
     }

@@ -189,7 +189,8 @@ struct WindowRow: View {
             }
             if let pace {
                 PaceBar(used: pace.usedPercent, budget: pace.budgetPercent, status: pace.status,
-                        baselineBudget: pace.baselineBudgetPercent, checkpoint: pace.checkpoint?.usedPercent)
+                        baselineBudget: userRepaced(pace) ? pace.baselineBudgetPercent : nil,
+                        checkpoint: userRepaced(pace) ? pace.checkpoint?.usedPercent : nil)
                 HStack(spacing: 14) {
                     stat(strings.used, UsageFormatter.percent(pace.usedPercent))
                     stat(strings.budget, UsageFormatter.percent(pace.budgetPercent))
@@ -241,11 +242,17 @@ struct WindowRow: View {
     }
 
     /// Either the offer to re-pace, or — once a checkpoint is set — what it is pacing and a way out.
+    /// A quota credit rebases the budget line on its own; only a re-pace the user asked for gets
+    /// the caption, the Clear button and the extra ticks explaining it.
+    private func userRepaced(_ pace: Pace) -> Bool {
+        pace.checkpoint != nil && !(repace?.automatic ?? false)
+    }
+
     @ViewBuilder
     private func repaceRow(pace: Pace, actions: RepaceActions) -> some View {
-        if let checkpoint = pace.checkpoint {
+        if let checkpoint = pace.checkpoint, userRepaced(pace) {
             HStack(spacing: 8) {
-                Text(repaceCaption(pace: pace, checkpoint: checkpoint, automatic: actions.automatic))
+                Text(repaceCaption(pace: pace, checkpoint: checkpoint))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -263,12 +270,11 @@ struct WindowRow: View {
         }
     }
 
-    private func repaceCaption(pace: Pace, checkpoint: PaceCheckpoint, automatic: Bool) -> String {
+    private func repaceCaption(pace: Pace, checkpoint: PaceCheckpoint) -> String {
         let config = PaceConfig()
         // "1d 3h ago" stays short whatever the locale's date format does once a day has passed.
-        let phrase = automatic ? strings.quotaRestoredSince : strings.repacedSince
-        var caption = phrase(UsageFormatter.percent(config.targetPercent - checkpoint.usedPercent),
-                             UsageFormatter.countdown(to: now, from: checkpoint.at))
+        var caption = strings.repacedSince(UsageFormatter.percent(config.targetPercent - checkpoint.usedPercent),
+                                           UsageFormatter.countdown(to: now, from: checkpoint.at))
         // The original line is still on the bar as the faint tick; spell out its delta too, so a
         // glance at "the whole week" needs no mode switch.
         if let baseline = pace.baselineBudgetPercent {

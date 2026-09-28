@@ -62,8 +62,6 @@ struct Strings {
     /// "overall ▲32": the delta against the original, un-re-paced budget
     let repaceOverall: (_ marker: String) -> String
     let repaceClear: String
-    /// Same shape as `repacedSince`, but for an origin a quota credit placed on its own.
-    let quotaRestoredSince: (_ remaining: String, _ ago: String) -> String
 
     // Claude Code availability
     let claudeCodeMissingTitle: String
@@ -207,7 +205,6 @@ struct Strings {
         repacedSince: { remaining, ago in "\(remaining) left · re-paced \(ago) ago" },
         repaceOverall: { marker in "overall \(marker)" },
         repaceClear: "Clear",
-        quotaRestoredSince: { remaining, ago in "\(remaining) left · restored \(ago) ago" },
 
         claudeCodeMissingTitle: "Claude Code not found",
         claudeCodeMissingBody: "AIUsage reads your quota through Claude Code, which is not installed on this Mac (or is not on your PATH — set its location in Settings → Claude Code).",
@@ -327,7 +324,6 @@ struct Strings {
         repacedSince: { remaining, ago in "剩余 \(remaining) · \(ago) 前重定" },
         repaceOverall: { marker in "整体 \(marker)" },
         repaceClear: "清除",
-        quotaRestoredSince: { remaining, ago in "剩余 \(remaining) · \(ago) 前恢复" },
 
         claudeCodeMissingTitle: "未找到 Claude Code",
         claudeCodeMissingBody: "AIUsage 通过 Claude Code 读取额度，但这台 Mac 上没有安装它（或它不在 PATH 里——可在 设置 → Claude Code 指定位置）。",

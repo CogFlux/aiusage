@@ -187,12 +187,14 @@ the current usage is deleted, not just ignored: the amount it treats as sunk has
 climbing past that base again must not revive a line anchored before the credit.
 
 Paced from the window start, usage of 0% at 85% elapsed reads as `▼85` — true, but saturated for the rest
-of the window. So a detected credit also becomes the default pace origin: the same `PaceCheckpoint` the
-"Re-pace from now" button sets, placed automatically at the credit (origin = the credit, target = 99% at
-the unchanged reset), which is what the restored quota actually has to be spent in. A checkpoint the user
-set by hand takes precedence, and *Clear* removes either, back to the plain line from the window start.
-The `quotaRestored` alert (`AlertConfig.quotaRestoredDropPoints`, same 10 points; `quotaRestoredCooldown`
-suppresses an echo from a session that has not refreshed) notifies, since no `windowReset` can fire here.
+of the window. So a detected credit rebases the even-pace line itself: the budget runs from the credit to
+99% at the unchanged reset, which is what the restored quota actually has to be spent in. Internally this
+reuses `PaceCheckpoint` (origin = the credit, base = usage just after it, so a partial credit works too),
+but it is a correction rather than a user setting — the popover shows none of the re-pace caption, Clear
+button or extra ticks for it, and only a checkpoint the user set by hand does. A hand-set checkpoint takes
+precedence over the credit's. The `quotaRestored` alert (`AlertConfig.quotaRestoredDropPoints`, the same
+10 points; `quotaRestoredCooldown` suppresses an echo from a session that has not refreshed) notifies,
+since no `windowReset` can fire here.
 
 ## 3. Pace calculation
 

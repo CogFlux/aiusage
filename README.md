@@ -30,8 +30,8 @@ Side effect of Query now: if no 5-hour window is currently active, the request s
 
 A **quota reset credit** zeroes usage but leaves the reset time alone, so the restored allowance has only
 the rest of the window. AIUsage notices the drop, notifies (Settings → General → Notifications), drops any
-re-pace checkpoint it invalidates, and paces the remainder from the credit onwards instead of showing a
-saturated `▼85` for days.
+re-pace checkpoint it invalidates, and rebases the even-pace line onto the credit — so the 7-day budget
+paces the restored quota over the time that is actually left, instead of reading a saturated `▼85` for days.
 
 **Re-pace from now** (7-day row). Burnt 60% by Tuesday? The even-pace line will say ▲30 until Sunday,
 which tells you nothing you can act on. Pressing the button treats what is used as spent and paces only
