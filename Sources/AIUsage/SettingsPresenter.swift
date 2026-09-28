@@ -12,12 +12,14 @@ import AppKit
 @MainActor
 enum SettingsPresenter {
     private static var observer: NSObjectProtocol?
+    private static var openedAt = Date.distantPast
 
     /// Opens Settings and brings it forward. Driven from a plain Button action rather than
     /// SwiftUI's `SettingsLink`: a gesture attached alongside that link is not reliably delivered,
     /// so the work here would silently never run. `showSettingsWindow:` is the action the link
     /// sends anyway, and sending it directly leaves the ordering in our hands.
     static func open() {
+        openedAt = Date()
         NSApp.setActivationPolicy(.regular)
         activate()
         observeWindowCloses()
@@ -36,7 +38,6 @@ enum SettingsPresenter {
     /// the back of the click the user just made.
     private static func activate() {
         NSApp.activate()
-        NSRunningApplication.current.activate(options: [.activateAllWindows])
     }
 
     private static func raise() {
@@ -63,6 +64,10 @@ enum SettingsPresenter {
     /// The MenuBarExtra popover is a borderless panel, so "titled" picks out exactly the windows
     /// that need the app to be regular — Settings, and Sparkle's update dialogs.
     private static func restoreIfNothingLeftOpen() {
+        // The popover closes the instant Settings is asked for, and it posts this notification too.
+        // Reverting then would undo the policy while the window is still being created, so leave a
+        // grace period after a request.
+        guard Date().timeIntervalSince(openedAt) > 2 else { return }
         let stillOpen = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) }
         if !stillOpen {
             NSApp.setActivationPolicy(.accessory)
