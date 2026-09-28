@@ -62,6 +62,8 @@ struct Strings {
     /// "overall ▲32": the delta against the original, un-re-paced budget
     let repaceOverall: (_ marker: String) -> String
     let repaceClear: String
+    /// Same shape as `repacedSince`, but for an origin a quota credit placed on its own.
+    let quotaRestoredSince: (_ remaining: String, _ ago: String) -> String
 
     // Claude Code availability
     let claudeCodeMissingTitle: String
@@ -126,6 +128,8 @@ struct Strings {
     let notifyOverPaceHint: String
     let notifyRunningOutHint: String
     let notifyWindowReset: String
+    let notifyQuotaRestored: String
+    let notifyQuotaRestoredHint: String
     let notificationsDenied: String
     let sendTestNotification: String
     let notificationsBannersOff: String
@@ -136,6 +140,9 @@ struct Strings {
     let alertRunningOutBody: (_ runoutTime: String, _ resetTime: String) -> String
     let alertResetTitle: (_ window: String) -> String
     let alertResetBody: String
+    let alertQuotaRestoredTitle: (_ window: String) -> String
+    /// The reset time has not moved — that is the point worth saying.
+    let alertQuotaRestoredBody: (_ used: String, _ resetTime: String) -> String
 
     // Updates
     let updates: String
@@ -200,6 +207,7 @@ struct Strings {
         repacedSince: { remaining, ago in "\(remaining) left · re-paced \(ago) ago" },
         repaceOverall: { marker in "overall \(marker)" },
         repaceClear: "Clear",
+        quotaRestoredSince: { remaining, ago in "\(remaining) left · restored \(ago) ago" },
 
         claudeCodeMissingTitle: "Claude Code not found",
         claudeCodeMissingBody: "AIUsage reads your quota through Claude Code, which is not installed on this Mac (or is not on your PATH — set its location in Settings → Claude Code).",
@@ -259,6 +267,8 @@ struct Strings {
         notifyOverPaceHint: "Usage crosses the tolerance: ±5 for 5h, ±3 for 7d",
         notifyRunningOutHint: "At the current rate the limit is 30 min (5h) / 12 h (7d) away",
         notifyWindowReset: "When the 5-hour window resets",
+        notifyQuotaRestored: "Quota restored",
+        notifyQuotaRestoredHint: "A reset credit zeroed usage; the window keeps its original reset time",
         notificationsDenied: "Notifications are turned off for AIUsage in System Settings → Notifications.",
         sendTestNotification: "Send test notification",
         notificationsBannersOff: "Notifications are allowed but the alert style is \"None\", so they only appear in Notification Center. Choose Banners or Alerts in System Settings.",
@@ -269,6 +279,8 @@ struct Strings {
         alertRunningOutBody: { runout, reset in "At the current rate you hit the limit at \(runout), before the reset at \(reset)." },
         alertResetTitle: { "\($0) reset" },
         alertResetBody: "Fresh quota is available.",
+        alertQuotaRestoredTitle: { "\($0) quota restored" },
+        alertQuotaRestoredBody: { used, reset in "Back to \(used) used. The window still resets at \(reset), so the restored quota has only until then." },
 
         updates: "Updates",
         checkForUpdates: "Check for Updates…",
@@ -315,6 +327,7 @@ struct Strings {
         repacedSince: { remaining, ago in "剩余 \(remaining) · \(ago) 前重定" },
         repaceOverall: { marker in "整体 \(marker)" },
         repaceClear: "清除",
+        quotaRestoredSince: { remaining, ago in "剩余 \(remaining) · \(ago) 前恢复" },
 
         claudeCodeMissingTitle: "未找到 Claude Code",
         claudeCodeMissingBody: "AIUsage 通过 Claude Code 读取额度，但这台 Mac 上没有安装它（或它不在 PATH 里——可在 设置 → Claude Code 指定位置）。",
@@ -374,6 +387,8 @@ struct Strings {
         notifyOverPaceHint: "用量越过容差时：5h ±5，7d ±3",
         notifyRunningOutHint: "按当前速度距用尽还有 30 分钟（5h）/ 12 小时（7d）时",
         notifyWindowReset: "5 小时窗口重置时",
+        notifyQuotaRestored: "额度已恢复",
+        notifyQuotaRestoredHint: "重置券把用量清零；窗口的重置时间不变",
         notificationsDenied: "AIUsage 的通知已在 系统设置 → 通知 中被关闭。",
         sendTestNotification: "发送测试通知",
         notificationsBannersOff: "通知已允许，但提示样式为\"无\"，所以只会出现在通知中心里不会弹出。请在系统设置里改为\"横幅\"或\"提醒\"。",
@@ -384,6 +399,8 @@ struct Strings {
         alertRunningOutBody: { runout, reset in "按当前速度将在 \(runout) 触顶，早于 \(reset) 的重置。" },
         alertResetTitle: { "\($0)已重置" },
         alertResetBody: "额度已刷新。",
+        alertQuotaRestoredTitle: { "\($0)额度已恢复" },
+        alertQuotaRestoredBody: { used, reset in "已用回落到 \(used)。窗口仍在 \(reset) 重置，恢复的额度只到那时为止。" },
 
         updates: "更新",
         checkForUpdates: "检查更新…",

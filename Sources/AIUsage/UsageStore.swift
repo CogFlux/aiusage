@@ -22,8 +22,10 @@ final class UsageStore: ObservableObject {
         static let notifyOverPace = "notifyOverPace"
         static let notifyRunningOut = "notifyRunningOut"
         static let notifyWindowReset = "notifyWindowReset"
+        static let notifyQuotaRestored = "notifyQuotaRestored"
         static let menuBarProvider = "menuBarProvider"
         static let checkpoints = "paceCheckpoints"
+        static let restorePoints = "paceRestorePoints"
     }
 
     /// A user-set "re-pace from now" point, bound to one window instance by its `resetsAt` so it
@@ -90,6 +92,7 @@ final class UsageStore: ObservableObject {
     @Published var notifyOverPace: Bool { didSet { notificationSettingChanged(notifyOverPace, key: Keys.notifyOverPace) } }
     @Published var notifyRunningOut: Bool { didSet { notificationSettingChanged(notifyRunningOut, key: Keys.notifyRunningOut) } }
     @Published var notifyWindowReset: Bool { didSet { notificationSettingChanged(notifyWindowReset, key: Keys.notifyWindowReset) } }
+    @Published var notifyQuotaRestored: Bool { didSet { notificationSettingChanged(notifyQuotaRestored, key: Keys.notifyQuotaRestored) } }
     @Published private(set) var notificationStatus = Notifier.Status()
 
     @Published var launchAtLogin: Bool {
@@ -108,10 +111,28 @@ final class UsageStore: ObservableObject {
     private var alertTracker = AlertTracker()
 
     @Published private(set) var storedCheckpoints: [WindowKind: StoredCheckpoint] = [:] {
-        didSet {
-            let encoded = Dictionary(uniqueKeysWithValues: storedCheckpoints.map { ($0.key.rawValue, $0.value) })
-            UserDefaults.standard.set(try? JSONEncoder().encode(encoded), forKey: Keys.checkpoints)
-        }
+        didSet { persist(storedCheckpoints, forKey: Keys.checkpoints) }
+    }
+
+    /// Where a quota reset credit landed, per window. Used as the pace origin when the user has
+    /// not set one of their own: after a credit the even-pace line from the window start says
+    /// only "far under budget" forever, while the restored quota really does have just the rest
+    /// of the window to be spent in.
+    @Published private(set) var restorePoints: [WindowKind: StoredCheckpoint] = [:] {
+        didSet { persist(restorePoints, forKey: Keys.restorePoints) }
+    }
+
+    private func persist(_ points: [WindowKind: StoredCheckpoint], forKey key: String) {
+        let encoded = Dictionary(uniqueKeysWithValues: points.map { ($0.key.rawValue, $0.value) })
+        UserDefaults.standard.set(try? JSONEncoder().encode(encoded), forKey: key)
+    }
+
+    private static func loadPoints(forKey key: String) -> [WindowKind: StoredCheckpoint] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([String: StoredCheckpoint].self, from: data) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: decoded.compactMap { key, value in
+            WindowKind(rawValue: key).map { ($0, value) }
+        })
     }
 
     var strings: Strings { Strings.forLanguage(language.resolved) }
@@ -137,14 +158,11 @@ final class UsageStore: ObservableObject {
         notifyOverPace = defaults.bool(forKey: Keys.notifyOverPace)
         notifyRunningOut = defaults.bool(forKey: Keys.notifyRunningOut)
         notifyWindowReset = defaults.bool(forKey: Keys.notifyWindowReset)
+        notifyQuotaRestored = defaults.bool(forKey: Keys.notifyQuotaRestored)
         launchAtLogin = LoginItem.isEnabled
         Strings.current = Strings.forLanguage(storedLanguage.resolved)
-        if let data = defaults.data(forKey: Keys.checkpoints),
-           let decoded = try? JSONDecoder().decode([String: StoredCheckpoint].self, from: data) {
-            storedCheckpoints = Dictionary(uniqueKeysWithValues: decoded.compactMap { key, value in
-                WindowKind(rawValue: key).map { ($0, value) }
-            })
-        }
+        storedCheckpoints = Self.loadPoints(forKey: Keys.checkpoints)
+        restorePoints = Self.loadPoints(forKey: Keys.restorePoints)
 
         refreshHookState()
         reloadFromFile()
@@ -214,6 +232,7 @@ final class UsageStore: ObservableObject {
             case .overPace: enabled = notifyOverPace
             case .runningOut: enabled = notifyRunningOut
             case .windowReset: enabled = notifyWindowReset && alert.claudeWindow == .fiveHour
+            case .quotaRestored: enabled = notifyQuotaRestored
             }
             if enabled {
                 notifier.deliver(alert, strings: strings, locale: locale)
@@ -235,11 +254,21 @@ final class UsageStore: ObservableObject {
     /// currently reported. A statusline write and a probe may disagree on `resetsAt` by a
     /// second or two, so the match is loose.
     func checkpoint(for kind: WindowKind) -> PaceCheckpoint? {
-        guard let stored = storedCheckpoints[kind], let window = snapshot?.window(kind),
-              abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120 else { return nil }
-        // Usage fell below the point we re-paced from — a quota reset credit. `merge` deletes
-        // these; this covers the moment before it runs.
-        guard window.usedPercent >= stored.checkpoint.usedPercent else { return nil }
+        // The user's own re-pace wins; a credit deletes it, so the two never both apply.
+        applicable(storedCheckpoints[kind], kind) ?? applicable(restorePoints[kind], kind)
+    }
+
+    /// True when the pace origin in effect was placed by a quota credit rather than by the user.
+    func checkpointIsAutomatic(_ kind: WindowKind) -> Bool {
+        applicable(storedCheckpoints[kind], kind) == nil && applicable(restorePoints[kind], kind) != nil
+    }
+
+    private func applicable(_ stored: StoredCheckpoint?, _ kind: WindowKind) -> PaceCheckpoint? {
+        guard let stored, let window = snapshot?.window(kind),
+              abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120,
+              // Usage below the origin means another credit landed after it; `merge` clears those,
+              // and this covers the moment before it runs.
+              window.usedPercent >= stored.checkpoint.usedPercent else { return nil }
         return stored.checkpoint
     }
 
@@ -259,11 +288,14 @@ final class UsageStore: ObservableObject {
         guard let window = snapshot?.window(kind), canRepace(kind) else { return }
         storedCheckpoints[kind] = StoredCheckpoint(resetsAt: window.resetsAt,
                                                    checkpoint: PaceCheckpoint(at: now, usedPercent: window.usedPercent))
+        restorePoints[kind] = nil
         evaluateAlerts()
     }
 
+    /// Clears whichever origin is in effect, back to the plain line from the window start.
     func clearCheckpoint(_ kind: WindowKind) {
         storedCheckpoints[kind] = nil
+        restorePoints[kind] = nil
         evaluateAlerts()
     }
 
@@ -331,22 +363,25 @@ final class UsageStore: ObservableObject {
 
     /// See `UsageSnapshot.merging` for the rule.
     private func merge(_ incoming: UsageSnapshot) {
+        let previous = snapshot
         snapshot = snapshot?.merging(incoming) ?? incoming
         now = Date()
-        dropCheckpointsOvertakenByAReset()
+        recordQuotaRestores(since: previous)
         evaluateAlerts()
     }
 
-    /// A quota reset credit zeroes usage without changing `resetsAt`, so a checkpoint set earlier
-    /// in the window survives an event that invalidates it: the amount it treats as sunk is back.
-    /// Delete it rather than ignore it — usage climbing past the old base again must not revive a
-    /// checkpoint anchored before the credit.
-    private func dropCheckpointsOvertakenByAReset() {
-        for (kind, stored) in storedCheckpoints {
-            guard let window = snapshot?.window(kind),
-                  abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120,
-                  window.usedPercent < stored.checkpoint.usedPercent else { continue }
+    /// A quota reset credit zeroes usage without changing `resetsAt`. Two consequences: any
+    /// checkpoint set earlier in the window is void — the amount it treats as sunk has come back,
+    /// and deleting rather than ignoring it stops usage climbing past the old base from reviving a
+    /// line anchored before the credit — and the credit itself becomes the sensible pace origin.
+    private func recordQuotaRestores(since previous: UsageSnapshot?) {
+        for kind in WindowKind.allCases {
+            guard let before = previous?.window(kind), let after = snapshot?.window(kind),
+                  abs(after.resetsAt.timeIntervalSince(before.resetsAt)) < 120,
+                  before.usedPercent - after.usedPercent >= AlertConfig().quotaRestoredDropPoints else { continue }
             storedCheckpoints[kind] = nil
+            restorePoints[kind] = StoredCheckpoint(resetsAt: after.resetsAt,
+                                                   checkpoint: PaceCheckpoint(at: now, usedPercent: after.usedPercent))
         }
     }
 

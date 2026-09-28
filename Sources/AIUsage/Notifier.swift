@@ -95,10 +95,15 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         case .windowReset:
             content.title = strings.alertResetTitle(windowName)
             content.body = strings.alertResetBody
+        case .quotaRestored:
+            content.title = strings.alertQuotaRestoredTitle(windowName)
+            content.body = strings.alertQuotaRestoredBody(UsageFormatter.percent(alert.pace.usedPercent), resetTime)
         }
         content.sound = .default
         // Identifier per condition and window instance, so a duplicate replaces rather than stacks.
-        let id = "\(alert.kind.rawValue)-\(alert.windowID)-\(Int(alert.resetsAt.timeIntervalSince1970))"
+        // A credit can be used more than once against the same instance, so keep those distinct.
+        var id = "\(alert.kind.rawValue)-\(alert.windowID)-\(Int(alert.resetsAt.timeIntervalSince1970))"
+        if alert.kind == .quotaRestored { id += "-\(Int(Date().timeIntervalSince1970))" }
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }
 }

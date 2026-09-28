@@ -71,6 +71,10 @@ struct SettingsView: View {
                         Text(s.notifyRunningOutHint)
                     }
                     Toggle(s.notifyWindowReset, isOn: $store.notifyWindowReset)
+                    Toggle(isOn: $store.notifyQuotaRestored) {
+                        Text(s.notifyQuotaRestored)
+                        Text(s.notifyQuotaRestoredHint)
+                    }
                     if store.notificationStatus.denied || store.notificationStatus.bannersOff {
                         HStack(alignment: .top) {
                             Text(store.notificationStatus.denied ? s.notificationsDenied : s.notificationsBannersOff)

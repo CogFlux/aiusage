@@ -28,6 +28,7 @@ struct MenuContentView: View {
                           // overspend haunts you for days. The 5-hour window is over soon anyway.
                           repace: kind == .sevenDay
                               ? .init(available: store.canRepace(kind),
+                                      automatic: store.checkpointIsAutomatic(kind),
                                       start: { store.repaceFromNow(kind) },
                                       clear: { store.clearCheckpoint(kind) })
                               : nil)
@@ -159,6 +160,8 @@ struct MenuContentView: View {
 struct WindowRow: View {
     struct RepaceActions {
         var available: Bool
+        /// The origin was placed by a quota credit, not by the user.
+        var automatic: Bool
         var start: () -> Void
         var clear: () -> Void
     }
@@ -242,7 +245,7 @@ struct WindowRow: View {
     private func repaceRow(pace: Pace, actions: RepaceActions) -> some View {
         if let checkpoint = pace.checkpoint {
             HStack(spacing: 8) {
-                Text(repaceCaption(pace: pace, checkpoint: checkpoint))
+                Text(repaceCaption(pace: pace, checkpoint: checkpoint, automatic: actions.automatic))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -260,11 +263,12 @@ struct WindowRow: View {
         }
     }
 
-    private func repaceCaption(pace: Pace, checkpoint: PaceCheckpoint) -> String {
+    private func repaceCaption(pace: Pace, checkpoint: PaceCheckpoint, automatic: Bool) -> String {
         let config = PaceConfig()
         // "1d 3h ago" stays short whatever the locale's date format does once a day has passed.
-        var caption = strings.repacedSince(UsageFormatter.percent(config.targetPercent - checkpoint.usedPercent),
-                                           UsageFormatter.countdown(to: now, from: checkpoint.at))
+        let phrase = automatic ? strings.quotaRestoredSince : strings.repacedSince
+        var caption = phrase(UsageFormatter.percent(config.targetPercent - checkpoint.usedPercent),
+                             UsageFormatter.countdown(to: now, from: checkpoint.at))
         // The original line is still on the bar as the faint tick; spell out its delta too, so a
         // glance at "the whole week" needs no mode switch.
         if let baseline = pace.baselineBudgetPercent {

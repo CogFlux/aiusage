@@ -186,10 +186,13 @@ write corrects it, and "Query now" is authoritative at any moment. A re-pace che
 the current usage is deleted, not just ignored: the amount it treats as sunk has come back, and usage later
 climbing past that base again must not revive a line anchored before the credit.
 
-Pace after a credit needs no special case: `budget` still counts from the window start, so usage of 0% at
-85% elapsed reads as `▼85` — correct, and the sign the allowance now exceeds what the remaining time can
-spend. "Re-pace from now" narrows it back to a meaningful line (origin = the credit, target = 99% at the
-unchanged reset) for anyone who wants one.
+Paced from the window start, usage of 0% at 85% elapsed reads as `▼85` — true, but saturated for the rest
+of the window. So a detected credit also becomes the default pace origin: the same `PaceCheckpoint` the
+"Re-pace from now" button sets, placed automatically at the credit (origin = the credit, target = 99% at
+the unchanged reset), which is what the restored quota actually has to be spent in. A checkpoint the user
+set by hand takes precedence, and *Clear* removes either, back to the plain line from the window start.
+The `quotaRestored` alert (`AlertConfig.quotaRestoredDropPoints`, same 10 points; `quotaRestoredCooldown`
+suppresses an echo from a session that has not refreshed) notifies, since no `windowReset` can fire here.
 
 ## 3. Pace calculation
 

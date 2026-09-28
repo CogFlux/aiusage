@@ -9,6 +9,9 @@ public enum AlertKind: String, CaseIterable, Codable, Sendable {
     case runningOut
     /// A window instance we were tracking has passed its `resetsAt`.
     case windowReset
+    /// Usage fell sharply inside a live window — a quota reset credit. The allowance is back but
+    /// `resetsAt` has not moved, so the restored quota still has only the rest of the window.
+    case quotaRestored
 }
 
 public struct UsageAlert: Equatable, Sendable {
@@ -41,6 +44,12 @@ public struct AlertConfig: Equatable, Sendable {
     public var rearmMargin: Double = 2
     /// Minimum time between two `overPace` alerts for the same window instance, per Claude window.
     public var overPaceCooldown: [WindowKind: TimeInterval] = [.fiveHour: 60 * 60, .sevenDay: 6 * 3600]
+    /// A drop of at least this many points inside a live window counts as a quota reset credit.
+    /// Matches `MergePolicy.genuineDropPoints`: below it a lower reading is treated as a stale one.
+    public var quotaRestoredDropPoints: Double = 10
+    /// A pre-credit reading re-emitted by a session that has not refreshed reads as a rise and
+    /// then a second fall; ignore a repeat within this window so one credit notifies once.
+    public var quotaRestoredCooldown: TimeInterval = 10 * 60
     public init() {}
 }
 
@@ -59,6 +68,8 @@ public struct AlertTracker: Equatable, Sendable {
     private var overPaceFiredAt: [String: Date] = [:]
     /// Instances whose over-pace alert fired; cleared when delta drops back below the re-arm line.
     private var overPaceDisarmed: Set<String> = []
+    /// When a quota-restored alert last fired, per instance.
+    private var quotaRestoredAt: [String: Date] = [:]
 
     public init() {}
 
@@ -97,7 +108,16 @@ public struct AlertTracker: Equatable, Sendable {
             guard let window, now < window.resetsAt else { continue }
             let pace = PaceCalculator.compute(window, now: now, config: paceConfig)
             let instance = "\(id)|\(window.resetsAt.timeIntervalSince1970)"
+            let previous = lastSeen[id]
             lastSeen[id] = Instance(resetsAt: window.resetsAt, pace: pace)
+
+            // Quota restored: usage fell sharply while the same instance is still running.
+            if let previous, previous.resetsAt == window.resetsAt,
+               previous.pace.usedPercent - window.usedPercent >= alertConfig.quotaRestoredDropPoints,
+               quotaRestoredAt[instance].map({ now.timeIntervalSince($0) >= alertConfig.quotaRestoredCooldown }) ?? true {
+                quotaRestoredAt[instance] = now
+                alerts.append(UsageAlert(kind: .quotaRestored, windowID: id, resetsAt: window.resetsAt, pace: pace))
+            }
 
             // Over pace: fires on entry; re-arms only after delta has come back down by the margin
             // (hysteresis) and not sooner than the cooldown since it last fired.

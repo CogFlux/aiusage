@@ -16,6 +16,23 @@ enum AlertTrackerChecks {
         tooEarlyNeverFires()
         overPaceHoveringOnTheThresholdFiresOnce()
         overPaceCooldownSpacesRepeats()
+        quotaRestoredFiresOnASharpDropInsideALiveWindow()
+    }
+
+    static func quotaRestoredFiresOnASharpDropInsideALiveWindow() {
+        var tracker = AlertTracker()
+        _ = tracker.evaluate(snapshot: snap(70, at: 7200), now: at(7200))
+        // A reset credit zeroes usage; resetsAt is unchanged, so the instance is still the same one.
+        var alerts = tracker.evaluate(snapshot: snap(0, at: 7260), now: at(7260))
+        Harness.check(alerts.contains { $0.kind == .quotaRestored }, "a sharp drop inside a live window fires")
+        // A session that has not refreshed re-emits the pre-credit number, then the truth returns:
+        // the cooldown keeps that from notifying twice for one credit.
+        _ = tracker.evaluate(snapshot: snap(70, at: 7300), now: at(7300))
+        alerts = tracker.evaluate(snapshot: snap(0, at: 7360), now: at(7360))
+        Harness.check(!alerts.contains { $0.kind == .quotaRestored }, "an echo does not fire a second alert")
+        // Ordinary growth never fires it.
+        alerts = tracker.evaluate(snapshot: snap(20, at: 9000), now: at(9000))
+        Harness.check(!alerts.contains { $0.kind == .quotaRestored }, "rising usage never fires")
     }
 
     // Delta oscillating around the 5h tolerance (+5): 4.6 ↔ 5.4 must not re-fire. Re-arm needs

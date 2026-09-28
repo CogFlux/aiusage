@@ -237,7 +237,7 @@ final class DeepSeekStore: ObservableObject {
                 switch alert.kind {
                 case .overPace: enabled = defaults.bool(forKey: "notifyOverPace")
                 case .runningOut: enabled = defaults.bool(forKey: "notifyRunningOut")
-                case .windowReset: enabled = false
+                case .windowReset, .quotaRestored: enabled = false
                 }
                 if enabled { notifier.deliver(alert, strings: strings(), locale: locale()) }
             }
