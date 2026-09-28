@@ -37,6 +37,7 @@ enum ParserChecks {
         mergeAcceptsLargeDropAsGenuine()
         mergeReleasesASmallDropAfterMaxHold()
         mergeLetsTheProbeOverrideAHeldValue()
+        mergeIgnoresThePreCreditEcho()
     }
 
     private static func snap(_ source: SnapshotSource, at t: TimeInterval, fiveHour: (Double, TimeInterval)?, sevenDay: (Double, TimeInterval)?) -> UsageSnapshot {
@@ -67,6 +68,28 @@ enum ParserChecks {
         // ...but not forever: past maxHold the newest reading wins.
         let later = snap(.statusline, at: 1000 + 601, fiveHour: nil, sevenDay: (65, 600000))
         Harness.equal(current.merging(later).window(.sevenDay)?.usedPercent, 65, "small drop accepted after maxHold")
+    }
+
+    /// After a credit, a session that has not refreshed re-emits the pre-credit number. That is a
+    /// rise, which would otherwise be taken, and usage would visibly jump back.
+    static func mergeIgnoresThePreCreditEcho() {
+        let before = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (70, 600000))
+        let credited = before.merging(snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (0, 600000)))
+        Harness.equal(credited.window(.sevenDay)?.usedPercent, 0, "the credit is taken")
+
+        let echo = snap(.statusline, at: 1120, fiveHour: nil, sevenDay: (70, 600000))
+        Harness.equal(credited.merging(echo).window(.sevenDay)?.usedPercent, 0, "the echo is ignored")
+        // Real usage after the credit still gets through.
+        let real = snap(.statusline, at: 1180, fiveHour: nil, sevenDay: (4, 600000))
+        let grown = credited.merging(real)
+        Harness.equal(grown.window(.sevenDay)?.usedPercent, 4, "genuine growth is taken")
+        Harness.check(grown.window(.sevenDay)?.echoGuard != nil, "the guard survives an ordinary update")
+        // A probe overrules it: it is a live call, so 70 there would be the truth.
+        let probe = snap(.probe, at: 1240, fiveHour: nil, sevenDay: (70, 600000))
+        Harness.equal(grown.merging(probe).window(.sevenDay)?.usedPercent, 70, "a probe overrules the guard")
+        // And the guard expires rather than blocking forever.
+        let later = snap(.statusline, at: 1060 + 1801, fiveHour: nil, sevenDay: (70, 600000))
+        Harness.equal(credited.merging(later).window(.sevenDay)?.usedPercent, 70, "the guard expires")
     }
 
     static func mergeLetsTheProbeOverrideAHeldValue() {

@@ -132,26 +132,14 @@ struct MenuContentView: View {
                 Label(s.settings, systemImage: "gearshape")
             }
             .simultaneousGesture(TapGesture().onEnded {
-                // An accessory app is not active, so Settings opens behind whatever is in front.
-                // Activating alone is not enough: this runs before SettingsLink creates the
-                // window, and reopening an existing one does not raise it. Raise it explicitly
-                // on the next runloop pass, once it exists.
-                NSApplication.shared.activate()
-                DispatchQueue.main.async { raiseSettingsWindow() }
+                // Accessory apps open Settings behind other windows unless activated.
+                NSApplication.shared.activate(ignoringOtherApps: true)
             })
             Spacer()
             Button(s.quit) {
                 NSApplication.shared.terminate(nil)
             }
         }
-    }
-
-    /// SwiftUI names the window of a `Settings` scene; there is no public handle to it.
-    private func raiseSettingsWindow() {
-        let window = NSApplication.shared.windows.first {
-            $0.identifier?.rawValue.contains("Settings") == true
-        }
-        window?.makeKeyAndOrderFront(nil)
     }
 
     private func caption(_ text: String) -> some View {

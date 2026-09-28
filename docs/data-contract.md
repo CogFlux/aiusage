@@ -180,9 +180,12 @@ write without being able to date the numbers themselves:
 | Lower by less, older than `maxHold` | Taken |
 
 Each `UsageWindow` carries its own `observedAt` for this, since a merge can keep one window from the older
-snapshot and take the other from the newer one. Residual: right after a credit, a session that has not yet
-made an API call can re-emit the pre-credit number, which reads as an increase and is taken; the next fresh
-write corrects it, and "Query now" is authoritative at any moment. A re-pace checkpoint whose base is above
+snapshot and take the other from the newer one. Accepting a credit also arms an `EchoGuard` on the window:
+a session that has not made an API call since keeps re-emitting the pre-credit number, which reads as a
+rise and would be taken, so readings at or above that level (less `echoGuardMargin`, 2 points) are ignored
+for `echoGuardDuration` (30 min) — long enough for every session to refresh, short enough that usage
+genuinely climbing back there is not plausible. A probe clears the guard, being a live call.
+A re-pace checkpoint whose base is above
 the current usage is deleted, not just ignored: the amount it treats as sunk has come back, and usage later
 climbing past that base again must not revive a line anchored before the credit.
 
