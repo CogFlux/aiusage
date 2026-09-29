@@ -35,6 +35,9 @@ enum ParserChecks {
         mergeIgnoresOlderObservation()
         mergeDropsExpiredWindowMissingFromIncoming()
         mergeIgnoresAPreviousWindowInstance()
+        mergeMovesOnFromAnExpiredWindow()
+        mergeFollowsLiveReadingsAcrossAccounts()
+        mergeRemembersCreditsAcrossAccountSwitches()
         mergeTakesAFreshCredit()
         mergeIgnoresAStaleDropHoweverLarge()
         mergeHoldsASmallFreshDip()
@@ -65,6 +68,40 @@ enum ParserChecks {
         let current = snap(.statusline, at: 1000, fiveHour: (5, 38000), sevenDay: nil)
         let previous = snap(.statusline, at: 1060, fiveHour: (90, 20000), sevenDay: nil)
         Harness.equal(current.merging(previous).window(.fiveHour)?.usedPercent, 5, "an earlier resetsAt is ignored")
+    }
+
+    static func mergeMovesOnFromAnExpiredWindow() {
+        // Nothing live reported the new instance yet, but the held one is over.
+        let current = snap(.statusline, at: 1000, fiveHour: (90, 20000), sevenDay: nil)
+        let next = snap(.statusline, at: 20100, fiveHour: (3, 38000), sevenDay: nil)
+        Harness.equal(current.merging(next, provenance: .stale(lastFreshAt: nil)).window(.fiveHour)?.usedPercent, 3,
+                      "an expired window gives way to a live one")
+    }
+
+    /// Seen live: after `/login` to another account, new sessions report that account's 7-day
+    /// window (resetting earlier), while old ones keep re-emitting the first account's.
+    static func mergeFollowsLiveReadingsAcrossAccounts() {
+        let old = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (4, 700000))
+        let other = snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (9, 600000))
+        Harness.equal(old.merging(other, provenance: .fresh).window(.sevenDay)?.usedPercent, 9,
+                      "a live reading of another window is followed, even with an earlier reset")
+        let switched = old.merging(other, provenance: .fresh)
+        let echo = snap(.statusline, at: 1120, fiveHour: nil, sevenDay: (87, 700000))
+        Harness.equal(switched.merging(echo, provenance: .stale(lastFreshAt: Date(timeIntervalSince1970: 500))).window(.sevenDay)?.usedPercent, 9,
+                      "an idle session of the other account does not pull it back")
+        Harness.equal(switched.merging(echo, provenance: .fresh).window(.sevenDay)?.usedPercent, 87,
+                      "but live use of that account does")
+    }
+
+    static func mergeRemembersCreditsAcrossAccountSwitches() {
+        let a = snap(.statusline, at: 1000, fiveHour: nil, sevenDay: (80, 700000))
+        let credited = a.merging(snap(.statusline, at: 1060, fiveHour: nil, sevenDay: (1, 700000)), provenance: .fresh)
+        let onB = credited.merging(snap(.statusline, at: 1120, fiveHour: nil, sevenDay: (9, 600000)), provenance: .fresh)
+        let backOnA = onB.merging(snap(.statusline, at: 1180, fiveHour: nil, sevenDay: (2, 700000)), provenance: .fresh)
+        Harness.equal(backOnA.window(.sevenDay)?.creditAt, Date(timeIntervalSince1970: 1060), "the credit comes back with its window")
+        let echo = snap(.statusline, at: 1240, fiveHour: nil, sevenDay: (80, 700000))
+        Harness.equal(backOnA.merging(echo, provenance: .stale(lastFreshAt: Date(timeIntervalSince1970: 900))).window(.sevenDay)?.usedPercent, 2,
+                      "so that account's pre-credit echoes stay ignored")
     }
 
     /// A quota reset credit lowers usage inside a live window (same `resetsAt`).

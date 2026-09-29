@@ -159,9 +159,13 @@ property of the source, not a bug; do not "correct" for it.
 Merge rule (`UsageSnapshot.merging` with `MergePolicy`), applied whenever a new observation arrives:
 
 1. An observation older than the current snapshot is ignored entirely.
-2. Per window, a later `resetsAt` (by more than 120 s) is the next window instance and wins outright; an
-   earlier one is a previous instance re-emitted and is ignored. Within 120 s it is the same instance, which
-   keeps the `resetsAt` it was first seen with.
+2. Per window, a `resetsAt` more than 120 s away is another instance: usually the next one after a reset,
+   but sessions signed in to different accounts (after a `/login`) report different windows side by side,
+   and neither reset time says which account is in use. So another instance is taken when the reading is
+   fresh (see below), or when the held window is over and the incoming one is live; otherwise it is ignored.
+   Within 120 s it is the same instance, which keeps the `resetsAt` it was first seen with. Credits are
+   remembered per instance (`UsageSnapshot.credits`), so switching to another account's window and back
+   does not let the first account's pre-credit numbers count again.
 3. A window missing from the incoming snapshot is kept only while its `resetsAt` is still in the future.
 4. `observedAt` and `source` follow the incoming snapshot.
 

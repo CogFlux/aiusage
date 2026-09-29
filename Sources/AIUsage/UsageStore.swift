@@ -454,8 +454,12 @@ final class UsageStore: ObservableObject {
     /// line anchored before the credit — and the credit itself becomes the sensible pace origin.
     private func recordQuotaRestores(since previous: UsageSnapshot?) {
         for kind in WindowKind.allCases {
+            // Only a change inside one instance is a new credit; switching to another account's
+            // window brings that window's own, older credit along.
             guard let after = snapshot?.window(kind), let creditAt = after.creditAt,
-                  creditAt != previous?.window(kind)?.creditAt else { continue }
+                  let before = previous?.window(kind),
+                  abs(before.resetsAt.timeIntervalSince(after.resetsAt)) <= MergePolicy().sameInstanceTolerance,
+                  creditAt != before.creditAt else { continue }
             storedCheckpoints[kind] = nil
             restorePoints[kind] = StoredCheckpoint(resetsAt: after.resetsAt,
                                                    checkpoint: PaceCheckpoint(at: creditAt, usedPercent: after.usedPercent))

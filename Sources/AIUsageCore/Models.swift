@@ -54,6 +54,20 @@ public enum SnapshotSource: String, Codable, Sendable {
     case probe
 }
 
+/// Where a quota credit landed, kept per window instance so it survives the display switching to
+/// another account's window and back: without it, that account's pre-credit numbers would count again.
+public struct CreditMark: Codable, Equatable, Sendable {
+    public var kind: WindowKind
+    public var resetsAt: Date
+    public var at: Date
+
+    public init(kind: WindowKind, resetsAt: Date, at: Date) {
+        self.kind = kind
+        self.resetsAt = resetsAt
+        self.at = at
+    }
+}
+
 /// Which Claude Code session wrote a statusline snapshot, and how much API time it has spent.
 public struct SessionStamp: Codable, Equatable, Sendable {
     public var id: String
@@ -151,8 +165,15 @@ public struct MergePolicy: Equatable, Sendable {
     /// Which of the two readings of one window to keep.
     public func resolve(current: UsageWindow, incoming: UsageWindow, provenance: Provenance) -> UsageWindow {
         let gap = incoming.resetsAt.timeIntervalSince(current.resetsAt)
-        if gap > sameInstanceTolerance { return incoming }   // the next window instance
-        if gap < -sameInstanceTolerance { return current }   // a previous one, re-emitted
+        if abs(gap) > sameInstanceTolerance {
+            // Another instance: usually the next one after a reset, but sessions signed in to
+            // different accounts report different windows side by side, and neither reset time
+            // says which account is in use. Follow live evidence; without it, move on only once
+            // the held window is over.
+            let heldIsOver = incoming.observedAt >= current.resetsAt
+            let incomingIsLive = incoming.resetsAt > incoming.observedAt
+            return provenance == .fresh || (heldIsOver && incomingIsLive) ? incoming : current
+        }
         var taken = incoming
         // One identity per instance, whatever jitter the sources have.
         taken.resetsAt = current.resetsAt
@@ -180,6 +201,8 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     public var windows: [UsageWindow]
     /// The statusline writer; nil for the probe.
     public var session: SessionStamp?
+    /// Credits seen in window instances that are still live, including ones not currently shown.
+    public var credits: [CreditMark]?
 
     public init(provider: String = "claude", source: SnapshotSource, observedAt: Date, windows: [UsageWindow],
                 session: SessionStamp? = nil) {
@@ -202,21 +225,39 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
                         policy: MergePolicy = MergePolicy()) -> UsageSnapshot {
         guard incoming.observedAt >= observedAt else { return self }
         let origin = provenance ?? (incoming.source == .probe ? .fresh : .stale(lastFreshAt: nil))
+        let tolerance = policy.sameInstanceTolerance
+        var credits = (credits ?? []).filter { $0.resetsAt > incoming.observedAt }
+        func mark(_ window: UsageWindow) -> Int? {
+            credits.firstIndex { $0.kind == window.kind && abs($0.resetsAt.timeIntervalSince(window.resetsAt)) <= tolerance }
+        }
+        func remember(_ window: UsageWindow) {
+            guard let at = window.creditAt else { return }
+            let entry = CreditMark(kind: window.kind, resetsAt: window.resetsAt, at: at)
+            if let i = mark(window) { credits[i] = entry } else { credits.append(entry) }
+        }
+        windows.forEach(remember)
+
         var merged = incoming
         merged.windows = WindowKind.allCases.compactMap { kind in
+            var result: UsageWindow?
             switch (window(kind), incoming.window(kind)) {
             case let (current?, new?):
-                return policy.resolve(current: current, incoming: new, provenance: origin)
+                result = policy.resolve(current: current, incoming: new, provenance: origin)
             case let (_, new?):
-                return new
+                result = new
             case let (current?, nil):
                 // Incoming lacks this window (e.g. it just reset or a probe omitted it); keep ours
                 // only while it is still live so a dropped window does not linger.
-                return current.resetsAt > incoming.observedAt ? current : nil
+                result = current.resetsAt > incoming.observedAt ? current : nil
             case (nil, nil):
-                return nil
+                result = nil
             }
+            guard var window = result else { return nil }
+            if window.creditAt == nil, let i = mark(window) { window.creditAt = credits[i].at }
+            remember(window)
+            return window
         }
+        merged.credits = credits.isEmpty ? nil : credits
         return merged
     }
 }
