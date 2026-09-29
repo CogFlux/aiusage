@@ -1,8 +1,7 @@
 #!/bin/bash
 # Build a release binary and wrap it in a minimal .app bundle (no Xcode needed).
 #   scripts/build-app.sh              → build/AIUsage.app for this Mac's architecture
-#   scripts/build-app.sh --universal  → arm64 + x86_64 (two builds joined with lipo;
-#                                        SwiftPM's --arch needs Xcode, explicit triples don't)
+#   scripts/build-app.sh --universal  → arm64 + x86_64 in one binary
 #   open build/AIUsage.app
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -15,19 +14,27 @@ SU_FEED_URL="${SU_FEED_URL:-https://aiusage.cogflux.io/appcast.xml}"
 SU_PUBLIC_KEY="${SU_PUBLIC_KEY:-$(cat sparkle-public-key.txt 2>/dev/null || true)}"
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 
+ARCH_FLAGS=()
 if [ "${1:-}" = "--universal" ]; then
-  swift build -c release --triple arm64-apple-macosx14.0
-  swift build -c release --triple x86_64-apple-macosx14.0
-  mkdir -p build
-  lipo -create -output build/AIUsage-universal \
-    .build/arm64-apple-macosx/release/AIUsage \
-    .build/x86_64-apple-macosx/release/AIUsage
-  BIN="build/AIUsage-universal"
-  RES=".build/arm64-apple-macosx/release/AIUsage_AIUsage.bundle"
-else
-  swift build -c release
-  BIN=".build/release/AIUsage"
-  RES=".build/release/AIUsage_AIUsage.bundle"
+  ARCH_FLAGS=(--arch arm64 --arch x86_64)
+fi
+# Ask SwiftPM where the products went rather than assuming: the layout changed with the build
+# system (Swift 6.4 writes .build/out/Products/Release for every architecture), and packaging a
+# path that is no longer written ships whatever old binary happens to be left there.
+swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
+BIN_DIR=$(swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)
+BIN="$BIN_DIR/AIUsage"
+RES="$BIN_DIR/AIUsage_AIUsage.bundle"
+
+STALE=$(find Sources Package.swift -type f -newer "$BIN" | head -1)
+if [ -n "$STALE" ]; then
+  echo "error: $BIN is older than $STALE; refusing to package a stale build" >&2
+  exit 1
+fi
+if [ "${1:-}" = "--universal" ]; then
+  for arch in arm64 x86_64; do
+    lipo "$BIN" -verify_arch "$arch" || { echo "error: $BIN lacks $arch" >&2; exit 1; }
+  done
 fi
 
 APP="build/AIUsage.app"
