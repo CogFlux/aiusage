@@ -14,7 +14,6 @@ enum SettingsPresenter {
     private static var makeContent: ((SettingsView.Tab) -> AnyView)?
     private static var onOpen: (() -> Void)?
     private static var tabs: NSTabViewController?
-    private static var resizeObserver: NSObjectProtocol?
 
     /// Called once at launch with the page for each tab, environment objects already attached.
     /// `onOpen` runs on every open: the window is kept between opens, so `onAppear` fires only once.
@@ -69,14 +68,7 @@ enum SettingsPresenter {
         window.isReleasedWhenClosed = false
         self.tabs = tabs
         self.window = window
-        resizeObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didEndLiveResizeNotification, object: window, queue: .main
-        ) { _ in
-            MainActor.assumeIsolated {
-                guard let page = tabs.tabView.selectedTabViewItem?.viewController else { return }
-                page.preferredContentSize = page.view.frame.size
-            }
-        }
+
         relabel()
         window.center()
         // Restores the last position when there is one.
