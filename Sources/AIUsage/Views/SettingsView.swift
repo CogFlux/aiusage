@@ -24,6 +24,8 @@ struct SettingsView: View {
         }
     }
 
+    static let minWidth: CGFloat = 460
+
     let tab: Tab
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
@@ -39,7 +41,8 @@ struct SettingsView: View {
             case .deepseek: deepseekTab
             }
         }
-        .frame(width: 460)
+        // Opens at its natural size and follows the window when it is resized.
+        .frame(minWidth: Self.minWidth, idealWidth: Self.minWidth, maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var generalTab: some View {

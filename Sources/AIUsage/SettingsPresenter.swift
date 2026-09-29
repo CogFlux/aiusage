@@ -14,6 +14,7 @@ enum SettingsPresenter {
     private static var makeContent: ((SettingsView.Tab) -> AnyView)?
     private static var onOpen: (() -> Void)?
     private static var tabs: NSTabViewController?
+    private static var resizeObserver: NSObjectProtocol?
 
     /// Called once at launch with the page for each tab, environment objects already attached.
     /// `onOpen` runs on every open: the window is kept between opens, so `onAppear` fires only once.
@@ -48,19 +49,34 @@ enum SettingsPresenter {
         tabs.tabStyle = .toolbar
         for tab in SettingsView.Tab.allCases {
             let page = NSHostingController(rootView: makeContent(tab))
-            // The window takes each page's height as its tab is selected.
-            page.sizingOptions = [.preferredContentSize]
+            // The tab controller pins each page to its preferredContentSize, and a hosting
+            // controller left to manage that keeps resetting it to the natural size — together
+            // they hold the window at one size. So the natural size is only the starting point,
+            // and a resize by the user becomes the page's size from then on.
+            page.sizingOptions = [.minSize]
+            page.preferredContentSize = page.view.fittingSize
             let item = NSTabViewItem(viewController: page)
             item.image = NSImage(systemSymbolName: tab.symbol, accessibilityDescription: nil)
             tabs.addTabViewItem(item)
         }
         let window = NSWindow(contentViewController: tabs)
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        // Opens at the page's natural size; once dragged, the window keeps the size it was given
+        // across tabs, and a page that no longer fits scrolls.
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.contentMinSize = NSSize(width: SettingsView.minWidth, height: 300)
         window.toolbarStyle = .preference
         // Kept after closing so reopening is instant and remembers the selected tab.
         window.isReleasedWhenClosed = false
         self.tabs = tabs
         self.window = window
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didEndLiveResizeNotification, object: window, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                guard let page = tabs.tabView.selectedTabViewItem?.viewController else { return }
+                page.preferredContentSize = page.view.frame.size
+            }
+        }
         relabel()
         window.center()
         // Restores the last position when there is one.
