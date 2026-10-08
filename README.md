@@ -3,7 +3,7 @@
 English · [中文](README.zh-CN.md)
 
 A macOS menu bar app that shows your Claude subscription quota (5-hour and 7-day windows) — and, optionally,
-your DeepSeek balance and burn rate — together with **pace**: assuming you want to land at exactly 99% when the window resets, how much should be used by now,
+your Codex (ChatGPT plan) quota and your DeepSeek balance and burn rate — together with **pace**: assuming you want to land at exactly 99% when the window resets, how much should be used by now,
 how much actually is, whether you are ahead or behind, and when you would run out at the current rate.
 
 ```
@@ -21,7 +21,7 @@ how much actually is, whether you are ahead or behind, and when you would run ou
 | Source | Cost | Freshness |
 |---|---|---|
 | **Claude Code statusline hook** (default) | none | live while a session is running; refreshed every 60s when idle |
-| **Query now** (button in the menu) | one tiny Haiku request, ~500 tokens ≈ $0.001 API-equivalent; covered by a Pro or Max subscription | instant |
+| **Query now** (↻ next to "Claude" in the menu; hover for the cost) | one tiny Haiku request, ~500 tokens ≈ $0.001 API-equivalent; covered by a Pro or Max subscription | instant |
 
 Both paths use interfaces Claude Code exposes officially. No OAuth tokens, no web scraping.
 Details in [docs/data-contract.md](docs/data-contract.md).
@@ -33,7 +33,7 @@ the rest of the window. AIUsage notices the drop, notifies (Settings → General
 re-pace checkpoint it invalidates, and rebases the even-pace line onto the credit — so the 7-day budget
 paces the restored quota over the time that is actually left, instead of reading a saturated `▼85` for days.
 
-**Re-pace from now** (7-day row). Burnt 60% by Tuesday? The even-pace line will say ▲30 until Sunday,
+**Re-pace from now** (7-day row, for Claude and Codex alike). Burnt 60% by Tuesday? The even-pace line will say ▲30 until Sunday,
 which tells you nothing you can act on. Pressing the button treats what is used as spent and paces only
 the remainder over the time left: the bar gains a dashed tick at the checkpoint and a faint one where the
 original budget would be, and Budget / Delta / Projected, the menu bar marker and the notifications all
@@ -48,17 +48,34 @@ Packaged releases check for updates through [Sparkle](https://sparkle-project.or
 
 Gear icon in the menu → Settings window.
 
-- **General**: language, which window the menu bar shows (5h / 7d), compact menu bar (just `42%`), launch at login,
-  notifications (over pace, running out before the reset, 5-hour window reset) with a test button, update checks.
+- **General**: language, layout (which providers the menu and the menu bar show, and in what order), which window
+  the menu bar shows (5h / 7d), compact menu bar (just `42%`), launch at login, notifications (over pace, running
+  out before the reset, 5-hour window reset) with a test button, update checks.
 - **Claude Code**: hook status and install, whether the hook also prints a usage line into Claude Code's own
   status line (only when you had none of your own; toggles at the next refresh, no restart), `claude` path.
+
+## Codex
+
+Settings → Codex. Reads the 5-hour and weekly windows of your ChatGPT plan through the Codex CLI's own app server
+(`codex app-server`, request `account/rateLimits/read`) every 5 minutes and whenever the menu opens. It is a
+usage lookup, not a model request: free, and it uses no quota. The windows are paced exactly like Claude's and
+share its notification switches; the menu bar shows them in the same form, `5h 6% ●`. Requires the Codex CLI, signed in
+with a ChatGPT account (`codex login`). Details in [docs/data-contract.md](docs/data-contract.md).
+
+## Layout
+
+Settings → General → Layout lists Claude, Codex and DeepSeek. For each: whether the menu shows it, whether the
+menu bar shows it, and up / down to reorder — the menu reads top to bottom and the menu bar left to right in
+that order. With more than one provider in the menu bar the items are joined by ` · `, e.g.
+`5h 42% ▲9 · 5h 6% ● · ¥42`, with no provider labels — the order tells them apart. Codex and DeepSeek appear once they
+are turned on in their own tabs.
 
 ## DeepSeek
 
 Settings → DeepSeek. Paste an API key and the app polls the free balance endpoint every 5 minutes, derives
 today's / this month's spend and a per-day burn rate from balance changes, and estimates when the balance runs
 out. Set a monthly budget to pace the month exactly like a Claude window (markers, notifications, menu bar
-`DS 42% ▲6`). The key is stored owner-only under `~/Library/Application Support/AIUsage/` and is sent only to
+`42% ▲6`). The key is stored owner-only under `~/Library/Application Support/AIUsage/` and is sent only to
 `api.deepseek.com/user/balance`.
 
 ## Language
@@ -117,6 +134,7 @@ MIT — see [LICENSE](LICENSE).
 - [x] In-app updates (Sparkle)
 - [ ] Show 5h and 7d side by side in the menu bar
 - [x] DeepSeek balance, burn rate and monthly budget pace
-- [ ] Customizable popover: choose which provider blocks are shown and in what order (e.g. Claude only, or DeepSeek above Claude)
-- [ ] Other providers (Codex / Cursor …)
+- [x] Customizable popover: choose which provider blocks are shown and in what order (e.g. Claude only, or DeepSeek above Claude)
+- [x] Codex
+- [ ] Other providers (Cursor …)
 - [x] Launch at login, notifications (over pace / running out / window reset)

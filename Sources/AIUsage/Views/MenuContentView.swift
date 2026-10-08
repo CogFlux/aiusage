@@ -4,13 +4,51 @@ import SwiftUI
 struct MenuContentView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
+    @EnvironmentObject var codex: CodexStore
     @Environment(\.dismiss) private var dismiss
 
     private var s: Strings { store.strings }
 
+    private var panelProviders: [Provider] {
+        var enabled: Set<Provider> = [.claude]
+        if codex.enabled { enabled.insert(.codex) }
+        if deepseek.enabled { enabled.insert(.deepseek) }
+        return store.layout.panel(enabled: enabled)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            let providers = panelProviders
+            if providers.isEmpty {
+                caption(s.panelEmpty)
+            }
+            ForEach(Array(providers.enumerated()), id: \.element) { index, provider in
+                if index > 0 { ProviderDivider() }
+                switch provider {
+                case .claude: claudeSection
+                case .codex: CodexSection()
+                case .deepseek: DeepSeekSection()
+                }
+            }
+            Divider()
+            footer
+        }
+        .padding(14)
+        .frame(width: 360)
+        .onAppear {
+            deepseek.tick()
+            codex.tick()
+            // Picks up a `claude` installed since the last look.
+            if store.resolvedClaudePath == nil { store.refreshClaudePath() }
+        }
+    }
+
+    private var claudeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             header
+            if case let .failed(message) = store.probeState {
+                errorText(message)
+            }
             if !store.claudeCodeInstalled {
                 claudeCodeMissing
             } else if store.fileHasNoQuota, store.snapshot == nil {
@@ -34,39 +72,36 @@ struct MenuContentView: View {
                                       clear: { store.clearCheckpoint(kind) })
                               : nil)
             }
-            Divider()
-            probeSection
-            if deepseek.enabled {
-                ProviderDivider()
-                DeepSeekSection()
-            }
             if !store.hookInstalled, store.claudeCodeInstalled {
                 Divider()
                 hookPrompt
             }
-            Divider()
-            footer
-        }
-        .padding(14)
-        .frame(width: 360)
-        .onAppear {
-            deepseek.tick()
-            // Picks up a `claude` installed since the last look.
-            if store.resolvedClaudePath == nil { store.refreshClaudePath() }
         }
     }
 
+    /// Same shape as the Codex and DeepSeek headers. Their refresh is free; this one sends a tiny
+    /// request, so the tooltip says what it costs.
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text("Claude").font(.title3.bold())
             Spacer()
-            if let confirmed = store.confirmed, let age = store.snapshotAge {
+            if store.probeState == .running {
+                ProgressView().controlSize(.small)
+            } else if let confirmed = store.confirmed, let age = store.snapshotAge {
                 Text(sourceLabel(confirmed.source) + " · " + age)
                     .font(.caption)
                     .foregroundStyle(store.isStale ? .orange : .secondary)
             } else {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
             }
+            Button {
+                store.probe()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+            .help(s.probeNow + " — " + s.probeHint)
+            .disabled(store.probeState == .running)
         }
     }
 
@@ -89,27 +124,6 @@ struct MenuContentView: View {
         switch source {
         case .statusline: return s.sourceStatusline
         case .probe: return s.sourceProbe
-        }
-    }
-
-    private var probeSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Button {
-                    store.probe()
-                } label: {
-                    Label(s.probeNow, systemImage: "arrow.clockwise")
-                }
-                .disabled(store.probeState == .running)
-                if store.probeState == .running {
-                    ProgressView().controlSize(.small)
-                }
-                Spacer()
-            }
-            caption(s.probeHint)
-            if case let .failed(message) = store.probeState {
-                errorText(message)
-            }
         }
     }
 
@@ -181,6 +195,8 @@ struct WindowRow: View {
     let strings: Strings
     let locale: Locale
     var repace: RepaceActions? = nil
+    /// What to say when the provider reports no such window; Claude's text by default.
+    var idleText: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -224,7 +240,7 @@ struct WindowRow: View {
                     repaceRow(pace: pace, actions: repace)
                 }
             } else if idle {
-                Text(strings.windowIdle).font(.caption).foregroundStyle(.secondary)
+                Text(idleText ?? strings.windowIdle).font(.caption).foregroundStyle(.secondary)
             } else {
                 Text(strings.noData).foregroundStyle(.secondary)
             }

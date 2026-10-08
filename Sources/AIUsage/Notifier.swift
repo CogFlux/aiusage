@@ -66,19 +66,20 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
-    private func windowName(for id: String, strings: Strings) -> String {
-        if let kind = WindowKind(rawValue: String(id.dropFirst("claude.".count))), id.hasPrefix("claude.") {
-            return strings.windowTitle(kind)
+    private func windowName(for alert: UsageAlert, strings: Strings) -> String {
+        if let kind = alert.claudeWindow { return strings.windowTitle(kind) }
+        if alert.provider == CodexStore.provider, let kind = alert.rateLimitWindow {
+            return strings.codexWindowTitle(kind)
         }
-        if id == "deepseek.month" { return strings.deepseekBudgetTitle }
-        return id
+        if alert.windowID == DeepSeekStore.windowID { return strings.deepseekBudgetTitle }
+        return alert.windowID
     }
 
     func deliver(_ alert: UsageAlert, strings: Strings, locale: Locale) {
         guard isSupported else { return }
         let content = UNMutableNotificationContent()
         let clock = Date.FormatStyle.dateTime.hour().minute().locale(locale)
-        let windowName = windowName(for: alert.windowID, strings: strings)
+        let windowName = windowName(for: alert, strings: strings)
         let resetTime = alert.resetsAt.formatted(clock)
         switch alert.kind {
         case .overPace:

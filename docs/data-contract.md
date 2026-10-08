@@ -133,6 +133,54 @@ Optional monthly budget: the calendar month becomes a `PaceWindow` (`id: deepsee
 `usedPercent = spentThisMonth / budget × 100`, tolerance 3, running-out lead 2 days) and goes through the
 same pace and alert code as Claude's windows.
 
+### 1.6 Codex (ChatGPT plans)
+
+Codex has the same two windows as Claude: a 5-hour one and a weekly one. The Codex CLI ships a JSON-RPC
+server for IDE integrations, `codex app-server` (newline-delimited JSON over stdio), and one of its requests
+reads the quota. The app spawns it, sends three lines and closes stdin once the answer is in, which ends the
+server (about 3 s in total; no child processes):
+
+```
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"aiusage","title":"AIUsage","version":"…"}}}
+{"jsonrpc":"2.0","method":"initialized"}
+{"jsonrpc":"2.0","id":2,"method":"account/rateLimits/read","params":{"excludeResetCreditDetails":true}}
+```
+
+The response (other lines, such as notifications, are skipped):
+
+```
+{"id":2,"result":{"rateLimits":{…},"rateLimitsByLimitId":{"codex":{"limitId":"codex",
+  "primary":{"usedPercent":6,"windowDurationMins":300,"resetsAt":1791208730},
+  "secondary":{"usedPercent":12,"windowDurationMins":10080,"resetsAt":1791699338},
+  "planType":"plus","rateLimitReachedType":null,…}},…}}
+```
+
+- The bucket is `rateLimitsByLimitId.codex`, falling back to `rateLimits` (the single-bucket view).
+- `usedPercent` is already 0…100; `resetsAt` is Unix seconds.
+- `resetsAt` is not taken as is. Readings of one window instance disagree by a few seconds (18:10:57,
+  18:11:00, 18:11:01 for one window), and the limit lifted only in the following minute (first accepted
+  request at 18:12:07, observed 2026-10-08). So the reported value is rounded to the nearest minute and
+  moved one minute later (`CodexParser.effectiveReset`): that window resets at 18:12. The rounding also keeps
+  one instance on a single `resetsAt`, which the alert state keys on.
+- Windows are matched to `five_hour` / `seven_day` by `windowDurationMins` (300 / 10080), not by
+  primary/secondary position. A window of any other length is dropped, because the pace math derives the
+  window start from the kind's fixed duration.
+- An `error` object in the response (e.g. not signed in) is shown verbatim.
+
+It is a usage lookup, not a model request: no tokens, no quota. So there is no passive source and no paid
+"query now" as with Claude; the app polls every 5 minutes while Codex is enabled and again when the menu
+opens if the numbers are over a minute old. The numbers count as stale (⧗) after 20 minutes without a
+successful poll. Each reading is authoritative, so no merge policy or session tracking applies.
+
+Pace windows get ids `codex.five_hour` / `codex.seven_day`, with Claude's tolerances and alert timing.
+Re-pacing works as for Claude (same `CheckpointBook`, stored under separate keys). With no merge to mark
+credits, a credit is a fall of at least 5 points (`MergePolicy.creditDropPoints`) inside one window instance
+between two consecutive readings; it rebases the line and voids a re-pace exactly as Claude's does.
+
+Codex also writes the same numbers into its session logs (`~/.codex/sessions/**/rollout-*.jsonl`, `token_count`
+events with a snake_case `rate_limits` object) after every model response. They are not read: the poll is
+free and fresher.
+
 ## 2. Unified model
 
 ```
@@ -314,6 +362,10 @@ than a day past their reset is pruned.
 
 Compact mode (for crowded menu bars) reduces the title to the bare percentage: `42%`, or `—` with no data;
 the window label, pace marker and stale marker are all dropped.
+
+Codex titles have the same form as Claude's (`5h 6% ●`); DeepSeek shows its balance (`¥42`) or, with a monthly
+budget, the budget's body without a window label (`42% ▲6`). No title carries a provider label. Several
+providers in the menu bar are joined by ` · ` in the user's order, which is what tells them apart.
 
 Percentages are rounded to integers (half up). Countdown format: `45s` / `7m` / `2h13m` / `3d 4h`; `0s` once past.
 

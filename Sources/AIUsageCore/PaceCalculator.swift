@@ -122,7 +122,14 @@ public struct PaceWindow: Equatable, Sendable {
 
     public static func claude(_ window: UsageWindow, config: PaceConfig = PaceConfig(),
                               alerts: AlertConfig = AlertConfig(), checkpoint: PaceCheckpoint? = nil) -> PaceWindow {
-        PaceWindow(id: "claude.\(window.kind.rawValue)", usedPercent: window.usedPercent,
+        rateLimit(window, provider: "claude", config: config, alerts: alerts, checkpoint: checkpoint)
+    }
+
+    /// A 5-hour or 7-day rate-limit window of any provider that reports them (Claude, Codex).
+    /// Same tolerances and alert timing as Claude's; the id is "<provider>.<kind>".
+    public static func rateLimit(_ window: UsageWindow, provider: String, config: PaceConfig = PaceConfig(),
+                                 alerts: AlertConfig = AlertConfig(), checkpoint: PaceCheckpoint? = nil) -> PaceWindow {
+        PaceWindow(id: "\(provider).\(window.kind.rawValue)", usedPercent: window.usedPercent,
                    startsAt: window.startsAt, resetsAt: window.resetsAt,
                    tolerance: config.tolerance(for: window.kind),
                    runningOutLead: alerts.runningOutLead[window.kind] ?? 30 * 60,

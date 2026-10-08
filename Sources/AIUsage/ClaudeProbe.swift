@@ -46,48 +46,9 @@ enum ClaudeProbe {
         "~/.claude/local/claude",
     ]
 
-    /// Only a found path is cached: `claude` may be installed while the app is running.
-    private static var loginShellCache: String?
-    private static let cacheLock = NSLock()
-
     /// May spawn a login shell, which can take a second or more: call it off the main thread.
     static func resolveClaudePath(override: String) -> String? {
-        let fm = FileManager.default
-        let trimmed = override.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            let p = expand(trimmed)
-            return fm.isExecutableFile(atPath: p) ? p : nil
-        }
-        if let found = candidatePaths.map(expand).first(where: { fm.isExecutableFile(atPath: $0) }) {
-            return found
-        }
-        if let cached = cacheLock.withLock({ loginShellCache }), fm.isExecutableFile(atPath: cached) {
-            return cached
-        }
-        let looked = loginShellLookup()
-        cacheLock.withLock { loginShellCache = looked }
-        return looked
-    }
-
-    private static func expand(_ path: String) -> String {
-        (path as NSString).expandingTildeInPath
-    }
-
-    /// GUI apps get a minimal PATH; ask the login shell where `claude` lives.
-    private static func loginShellLookup() -> String? {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        p.arguments = ["-lc", "command -v claude"]
-        // Keep shell startup files (prompt plugins, git status) away from the app's cwd.
-        p.currentDirectoryURL = FileManager.default.temporaryDirectory
-        let pipe = Pipe()
-        p.standardOutput = pipe
-        p.standardError = FileHandle.nullDevice
-        do { try p.run() } catch { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        let s = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        return (p.terminationStatus == 0 && !s.isEmpty) ? s : nil
+        ExecutableLocator.resolve("claude", candidates: candidatePaths, override: override)
     }
 
     static func run(claudePath: String, extraEnv: [String: String], timeout: TimeInterval = 60) async throws -> UsageSnapshot {

@@ -23,25 +23,15 @@ final class UsageStore: ObservableObject {
         static let notifyRunningOut = "notifyRunningOut"
         static let notifyWindowReset = "notifyWindowReset"
         static let notifyQuotaRestored = "notifyQuotaRestored"
+        /// Superseded by `layout`; read once to carry the choice over.
         static let menuBarProvider = "menuBarProvider"
+        static let layout = "providerLayout"
         static let checkpoints = "paceCheckpoints"
         static let restorePoints = "paceRestorePoints"
         static let lastSnapshot = "lastSnapshot"
         static let sessionTracker = "sessionTracker"
         static let alertTracker = "alertTracker"
         static let lastLive = "lastLiveReading"
-    }
-
-    /// A user-set "re-pace from now" point, bound to one window instance by its `resetsAt` so it
-    /// silently expires when that window ends.
-    struct StoredCheckpoint: Codable, Equatable {
-        var resetsAt: Date
-        var checkpoint: PaceCheckpoint
-    }
-
-    enum MenuBarProvider: String, CaseIterable {
-        case claude
-        case deepseek
     }
 
     /// Persisted, so a restart does not begin by believing whichever session happened to write the
@@ -132,37 +122,25 @@ final class UsageStore: ObservableObject {
     var loginItemSupported: Bool { LoginItem.isSupported }
 
     let notifier: Notifier
-    @Published var menuBarProvider: MenuBarProvider {
-        didSet { UserDefaults.standard.set(menuBarProvider.rawValue, forKey: Keys.menuBarProvider) }
+    /// Which providers the menu and the menu bar show, in what order.
+    @Published var layout: ProviderLayout {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(layout), forKey: Keys.layout) }
     }
     var notificationsSupported: Bool { notifier.isSupported }
     /// Persisted, so a relaunch does not repeat notifications that already fired.
     private var alertTracker = AlertTracker()
 
-    @Published private(set) var storedCheckpoints: [WindowKind: StoredCheckpoint] = [:] {
-        didSet { persist(storedCheckpoints, forKey: Keys.checkpoints) }
-    }
-
-    /// Where a quota reset credit landed, per window. The even-pace line is rebased onto it, so
-    /// the default budget runs from the credit to 99% at the unchanged reset — what the restored
-    /// quota actually has to be spent in — rather than reading "far under budget" until the window
-    /// ends. This is a correction to the line, not a user setting: the UI shows no re-pace state
-    /// for it. A checkpoint the user set by hand still wins.
-    @Published private(set) var restorePoints: [WindowKind: StoredCheckpoint] = [:] {
-        didSet { persist(restorePoints, forKey: Keys.restorePoints) }
-    }
-
-    private func persist(_ points: [WindowKind: StoredCheckpoint], forKey key: String) {
-        let encoded = Dictionary(uniqueKeysWithValues: points.map { ($0.key.rawValue, $0.value) })
-        UserDefaults.standard.set(try? JSONEncoder().encode(encoded), forKey: key)
-    }
-
-    private static func loadPoints(forKey key: String) -> [WindowKind: StoredCheckpoint] {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([String: StoredCheckpoint].self, from: data) else { return [:] }
-        return Dictionary(uniqueKeysWithValues: decoded.compactMap { key, value in
-            WindowKind(rawValue: key).map { ($0, value) }
-        })
+    /// Re-pace points and quota-credit origins; see `CheckpointBook`.
+    @Published private(set) var checkpoints = CheckpointBook() {
+        didSet {
+            let defaults = UserDefaults.standard
+            if checkpoints.manual != oldValue.manual {
+                defaults.set(CheckpointBook.encode(checkpoints.manual), forKey: Keys.checkpoints)
+            }
+            if checkpoints.restores != oldValue.restores {
+                defaults.set(CheckpointBook.encode(checkpoints.restores), forKey: Keys.restorePoints)
+            }
+        }
     }
 
     var strings: Strings { Strings.forLanguage(language.resolved) }
@@ -178,7 +156,14 @@ final class UsageStore: ObservableObject {
     init(notifier: Notifier) {
         self.notifier = notifier
         let defaults = UserDefaults.standard
-        menuBarProvider = MenuBarProvider(rawValue: defaults.string(forKey: Keys.menuBarProvider) ?? "") ?? .claude
+        if let data = defaults.data(forKey: Keys.layout),
+           let saved = try? JSONDecoder().decode(ProviderLayout.self, from: data) {
+            layout = saved
+        } else {
+            // Before the layout existed the menu bar showed exactly one provider.
+            let previous = Provider(rawValue: defaults.string(forKey: Keys.menuBarProvider) ?? "") ?? .claude
+            layout = ProviderLayout(inMenuBar: [previous])
+        }
         claudePathOverride = defaults.string(forKey: Keys.claudePath) ?? ""
         menuBarKind = WindowKind(rawValue: defaults.string(forKey: Keys.menuBarKind) ?? "") ?? .fiveHour
         let storedLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
@@ -207,8 +192,8 @@ final class UsageStore: ObservableObject {
            let remembered = try? JSONDecoder().decode(LiveReading?.self, from: data) {
             lastLive = remembered
         }
-        storedCheckpoints = Self.loadPoints(forKey: Keys.checkpoints)
-        restorePoints = Self.loadPoints(forKey: Keys.restorePoints)
+        checkpoints = CheckpointBook(manual: CheckpointBook.decode(defaults.data(forKey: Keys.checkpoints)),
+                                     restores: CheckpointBook.decode(defaults.data(forKey: Keys.restorePoints)))
 
         refreshHookState()
         refreshClaudePath()
@@ -273,7 +258,7 @@ final class UsageStore: ObservableObject {
     private func evaluateAlerts() {
         let before = alertTracker
         let alerts = alertTracker.evaluate(snapshot: snapshot, now: now, paceConfig: config,
-                                           checkpoints: activeCheckpoints)
+                                           checkpoints: checkpoints.active(for: snapshot?.windows ?? []))
         if alertTracker != before {
             UserDefaults.standard.set(try? JSONEncoder().encode(alertTracker), forKey: Keys.alertTracker)
         }
@@ -301,54 +286,29 @@ final class UsageStore: ObservableObject {
 
     // MARK: Re-pace checkpoints
 
-    /// The stored checkpoint for `kind`, but only while the window it was set on is the one
-    /// currently reported. A statusline write and a probe may disagree on `resetsAt` by a
-    /// second or two, so the match is loose.
+    /// The origin in effect for `kind`, only while the window it was set on is the one reported.
     func checkpoint(for kind: WindowKind) -> PaceCheckpoint? {
-        // The user's own re-pace wins; a credit deletes it, so the two never both apply.
-        applicable(storedCheckpoints[kind], kind) ?? applicable(restorePoints[kind], kind)
+        checkpoints.checkpoint(for: snapshot?.window(kind))
     }
 
     /// True when the pace origin in effect was placed by a quota credit rather than by the user.
     func checkpointIsAutomatic(_ kind: WindowKind) -> Bool {
-        applicable(storedCheckpoints[kind], kind) == nil && applicable(restorePoints[kind], kind) != nil
-    }
-
-    private func applicable(_ stored: StoredCheckpoint?, _ kind: WindowKind) -> PaceCheckpoint? {
-        guard let stored, let window = snapshot?.window(kind),
-              abs(window.resetsAt.timeIntervalSince(stored.resetsAt)) < 120,
-              // Usage below the origin means another credit landed after it; `merge` clears those,
-              // and this covers the moment before it runs.
-              window.usedPercent >= stored.checkpoint.usedPercent else { return nil }
-        return stored.checkpoint
-    }
-
-    private var activeCheckpoints: [WindowKind: PaceCheckpoint] {
-        Dictionary(uniqueKeysWithValues: WindowKind.allCases.compactMap { kind in
-            checkpoint(for: kind).map { (kind, $0) }
-        })
+        checkpoints.isAutomatic(snapshot?.window(kind))
     }
 
     /// Whether "re-pace from now" makes sense right now: a live window with quota left.
     func canRepace(_ kind: WindowKind) -> Bool {
-        guard let window = snapshot?.window(kind) else { return false }
-        return now < window.resetsAt && window.usedPercent < config.targetPercent
+        CheckpointBook.canRepace(snapshot?.window(kind), now: now, config: config)
     }
 
     func repaceFromNow(_ kind: WindowKind) {
         guard let window = snapshot?.window(kind), canRepace(kind) else { return }
-        storedCheckpoints[kind] = StoredCheckpoint(resetsAt: window.resetsAt,
-                                                   checkpoint: PaceCheckpoint(at: now, usedPercent: window.usedPercent))
-        // The credit's own origin stays on file: precedence hides it while this one exists, and
-        // clearing this one must fall back to it rather than to the pre-credit line.
+        checkpoints.repace(window, now: now)
         evaluateAlerts()
     }
 
-    /// Undoes the user's own re-pace. A quota credit's rebase is a correction to the line rather
-    /// than a choice, so it is not cleared here — the budget falls back to it, not to the line
-    /// from the window start that the credit made wrong.
     func clearCheckpoint(_ kind: WindowKind) {
-        storedCheckpoints[kind] = nil
+        checkpoints.clear(kind)
         evaluateAlerts()
     }
 
@@ -460,9 +420,7 @@ final class UsageStore: ObservableObject {
                   let before = previous?.window(kind),
                   abs(before.resetsAt.timeIntervalSince(after.resetsAt)) <= MergePolicy().sameInstanceTolerance,
                   creditAt != before.creditAt else { continue }
-            storedCheckpoints[kind] = nil
-            restorePoints[kind] = StoredCheckpoint(resetsAt: after.resetsAt,
-                                                   checkpoint: PaceCheckpoint(at: creditAt, usedPercent: after.usedPercent))
+            checkpoints.recordCredit(in: after, at: creditAt)
         }
     }
 

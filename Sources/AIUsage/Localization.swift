@@ -118,6 +118,33 @@ struct Strings {
     let alertLowBalanceTitle: String
     let alertLowBalanceBody: (_ amount: String, _ runout: String?) -> String
 
+    // Codex
+    let codexEnable: String
+    let codexEnableHint: String
+    let codexRefresh: String
+    let codexPath: String
+    let codexPathPlaceholder: String
+    let codexNotInstalled: String
+    let codexPathInvalid: String
+    let codexInstall: String
+    let codexOff: String
+    let codexWindowIdle: String
+    let codexLimitReached: String
+    let codexTimeout: String
+    let codexExited: (_ code: Int32, _ stderrTail: String) -> String
+    let codexServerError: (_ message: String) -> String
+
+    // Layout
+    let layout: String
+    let layoutHint: String
+    let layoutPanel: String
+    let layoutMenuBar: String
+    let layoutMoveUp: String
+    let layoutMoveDown: String
+    /// "Off — turn it on in the Codex tab"
+    let layoutProviderOff: (_ tab: String) -> String
+    let panelEmpty: String
+
     // Startup & notifications
     let launchAtLogin: String
     let notifications: String
@@ -153,7 +180,6 @@ struct Strings {
     let general: String
     let claudeCode: String
     let menuBarShows: String
-    let menuBarProvider: String
     let compactMenuBar: String
     let compactMenuBarHint: String
     let language: String
@@ -180,6 +206,10 @@ struct Strings {
         case .fiveHour: return fiveHourTitle
         case .sevenDay: return sevenDayTitle
         }
+    }
+
+    func codexWindowTitle(_ kind: AIUsageCore.WindowKind) -> String {
+        "Codex " + windowTitle(kind)
     }
 
     static let en = Strings(
@@ -257,6 +287,30 @@ struct Strings {
         alertLowBalanceTitle: "DeepSeek balance low",
         alertLowBalanceBody: { amount, runout in runout.map { "\(amount) left — runs out around \($0) at the current rate." } ?? "\(amount) left." },
 
+        codexEnable: "Track Codex quota",
+        codexEnableHint: "Reads the 5-hour and weekly windows of your ChatGPT plan through the Codex CLI (`codex app-server`) every 5 minutes and whenever you open the menu. A usage lookup, not a model request: free, and it uses no quota. Over-pace, running-out and reset notifications follow the switches in General.",
+        codexRefresh: "Refresh now",
+        codexPath: "codex path",
+        codexPathPlaceholder: "Not found — enter full path",
+        codexNotInstalled: "The Codex CLI is not installed, or not on your PATH. Install it, or set its location in Settings → Codex.",
+        codexPathInvalid: "The codex path in Settings does not point to an executable.",
+        codexInstall: "Install Codex CLI",
+        codexOff: "Codex tracking is off. Turn it on in Settings → Codex.",
+        codexWindowIdle: "Codex reported no such window for your plan.",
+        codexLimitReached: "Limit reached",
+        codexTimeout: "Codex did not answer in time (30s)",
+        codexExited: { code, tail in "codex exited with code \(code)" + (tail.isEmpty ? "" : ": \(tail)") },
+        codexServerError: { message in "Codex: \(message). If you are not signed in, run `codex login` in Terminal." },
+
+        layout: "Layout",
+        layoutHint: "What the menu and the menu bar show, top to bottom and left to right.",
+        layoutPanel: "Menu",
+        layoutMenuBar: "Menu bar",
+        layoutMoveUp: "Move up",
+        layoutMoveDown: "Move down",
+        layoutProviderOff: { tab in "Off — turn it on in the \(tab) tab" },
+        panelEmpty: "Nothing to show. Choose what the menu shows in Settings → General → Layout.",
+
         launchAtLogin: "Launch at login",
         notifications: "Notifications",
         notifyOverPace: "Over pace (early warning)",
@@ -288,7 +342,6 @@ struct Strings {
         general: "General",
         claudeCode: "Claude Code",
         menuBarShows: "Menu bar window",
-        menuBarProvider: "Menu bar shows",
         compactMenuBar: "Compact menu bar",
         compactMenuBarHint: "Show only the percentage (\"42%\") instead of \"5h 42% ▲9\". For crowded menu bars.",
         language: "Language",
@@ -376,6 +429,30 @@ struct Strings {
         alertLowBalanceTitle: "DeepSeek 余额不足",
         alertLowBalanceBody: { amount, runout in runout.map { "剩余 \(amount)，按当前速度约 \($0) 用完。" } ?? "剩余 \(amount)。" },
 
+        codexEnable: "跟踪 Codex 额度",
+        codexEnableHint: "通过 Codex CLI（`codex app-server`）读取 ChatGPT 套餐的 5 小时和每周窗口，每 5 分钟一次，打开菜单时也会刷新。这是用量查询，不是模型请求：免费，不消耗额度。超速、即将用尽和重置通知沿用「通用」里的开关。",
+        codexRefresh: "立即刷新",
+        codexPath: "codex 路径",
+        codexPathPlaceholder: "未找到，请填写完整路径",
+        codexNotInstalled: "未安装 Codex CLI，或它不在 PATH 里。请安装，或在 设置 → Codex 指定位置。",
+        codexPathInvalid: "设置里填写的 codex 路径不是可执行文件。",
+        codexInstall: "安装 Codex CLI",
+        codexOff: "Codex 跟踪未开启。请在 设置 → Codex 打开。",
+        codexWindowIdle: "Codex 没有为你的套餐报告这个窗口。",
+        codexLimitReached: "已触顶",
+        codexTimeout: "Codex 未能及时响应（30s）",
+        codexExited: { code, tail in "codex 退出码 \(code)" + (tail.isEmpty ? "" : "：\(tail)") },
+        codexServerError: { message in "Codex：\(message)。如果尚未登录，请在终端运行 `codex login`。" },
+
+        layout: "显示内容与顺序",
+        layoutHint: "主界面（菜单）和菜单栏显示哪些服务，按从上到下、从左到右的顺序。",
+        layoutPanel: "主界面",
+        layoutMenuBar: "菜单栏",
+        layoutMoveUp: "上移",
+        layoutMoveDown: "下移",
+        layoutProviderOff: { tab in "未开启，请在「\(tab)」页打开" },
+        panelEmpty: "没有要显示的内容。请在 设置 → 通用 → 显示内容与顺序 中选择。",
+
         launchAtLogin: "登录时启动",
         notifications: "通知",
         notifyOverPace: "超速（预警）",
@@ -407,7 +484,6 @@ struct Strings {
         general: "通用",
         claudeCode: "Claude Code",
         menuBarShows: "菜单栏显示窗口",
-        menuBarProvider: "菜单栏显示",
         compactMenuBar: "精简菜单栏",
         compactMenuBarHint: "只显示百分比（\"42%\"），不显示 \"5h 42% ▲9\"。菜单栏拥挤时使用。",
         language: "语言",

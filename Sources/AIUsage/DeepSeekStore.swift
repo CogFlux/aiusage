@@ -231,15 +231,15 @@ final class DeepSeekStore: ObservableObject {
         return f.string(from: NSNumber(value: amount)) ?? String(format: "%.2f", amount)
     }
 
-    /// "DS ¥42", "DS 42% ▲6" with a budget; compact "¥42" / "42%".
+    /// "¥42", or "42% ▲6" with a budget; compact "42%".
     func menuBarTitle(compact: Bool) -> String {
-        guard let latest else { return compact ? "—" : "DS —" }
+        guard let latest else { return "—" }
         if let pace = budgetPace {
             let body = UsageFormatter.menuBarTitle(kind: .fiveHour, pace: pace, stale: false, compact: compact)
-            return compact ? body : "DS " + body.dropFirst(3)
+            // Drop the "5h " window label: a month budget has none.
+            return compact ? body : String(body.dropFirst(3))
         }
-        let amount = money(latest.total, compact: true)
-        return compact ? amount : "DS " + amount
+        return money(latest.total, compact: true)
     }
 
     // MARK: Alerts

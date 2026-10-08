@@ -31,8 +31,17 @@ public struct UsageAlert: Equatable, Sendable {
 
     /// The Claude window this alert is about, if it is one.
     public var claudeWindow: WindowKind? {
-        guard windowID.hasPrefix("claude.") else { return nil }
-        return WindowKind(rawValue: String(windowID.dropFirst("claude.".count)))
+        provider == "claude" ? rateLimitWindow : nil
+    }
+
+    /// "claude", "codex", "deepseek": the part of `windowID` before the dot.
+    public var provider: String {
+        String(windowID.prefix { $0 != "." })
+    }
+
+    /// The 5-hour or 7-day window this alert is about, whichever provider it belongs to.
+    public var rateLimitWindow: WindowKind? {
+        WindowKind(rawValue: String(windowID.dropFirst(provider.count + 1)))
     }
 }
 
