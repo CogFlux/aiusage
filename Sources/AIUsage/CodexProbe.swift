@@ -10,6 +10,8 @@ enum CodexProbe {
         case timeout
         case exited(Int32, String)
         case server(String)
+        /// Codex could not reach the backend; see `CodexParser.ResponseError.isNetworkFailure`.
+        case network
 
         var errorDescription: String? {
             let strings = Strings.current
@@ -21,6 +23,8 @@ enum CodexProbe {
                 return strings.codexExited(code, tail)
             case let .server(message):
                 return strings.codexServerError(message)
+            case .network:
+                return strings.codexNetworkError
             }
         }
     }
@@ -111,8 +115,8 @@ enum CodexProbe {
         switch state.outcome {
         case let .usage(usage)?:
             return usage
-        case let .failure(message)?:
-            throw ProbeError.server(message)
+        case let .failure(error)?:
+            throw error.isNetworkFailure ? ProbeError.network : ProbeError.server(error.message)
         case nil:
             if timedOut {
                 if process.isRunning { process.terminate() }
@@ -132,7 +136,7 @@ enum CodexProbe {
 private final class ReadState: @unchecked Sendable {
     enum Outcome {
         case usage(CodexUsage)
-        case failure(String)
+        case failure(CodexParser.ResponseError)
     }
 
     private let lock = NSLock()
@@ -153,9 +157,9 @@ private final class ReadState: @unchecked Sendable {
                         result = .usage(usage)
                     }
                 } catch let error as CodexParser.ResponseError {
-                    result = .failure(error.message)
+                    result = .failure(error)
                 } catch {
-                    result = .failure(error.localizedDescription)
+                    result = .failure(CodexParser.ResponseError(message: error.localizedDescription))
                 }
                 if result != nil { return true }
             }

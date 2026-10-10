@@ -14,7 +14,7 @@ struct CodexSection: View {
             if !codex.codexInstalled {
                 missing
             } else if let error = codex.lastError {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(codex.errorIsMinor ? Color.secondary : .red)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if codex.usage != nil {

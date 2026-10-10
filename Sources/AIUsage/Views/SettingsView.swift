@@ -224,7 +224,7 @@ struct SettingsView: View {
                     .font(.callout.monospaced())
                 HStack(alignment: .top) {
                     if let error = codex.lastError {
-                        Text(error).font(.caption).foregroundStyle(.red)
+                        Text(error).font(.caption).foregroundStyle(codex.errorIsMinor ? Color.secondary : .red)
                             .fixedSize(horizontal: false, vertical: true)
                     } else if let summary = codexSummary {
                         Text(summary).font(.caption).foregroundStyle(.secondary)

@@ -57,6 +57,8 @@ final class CodexStore: ObservableObject {
     @Published private(set) var now = Date()
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
+    /// The last error was a network failure: the reading shown is merely older, not wrong.
+    @Published private(set) var lastErrorIsNetwork = false
 
     let config = PaceConfig()
     private let notifier: Notifier
@@ -139,19 +141,40 @@ final class CodexStore: ObservableObject {
             guard let path = await lookUpPath() else {
                 let overrideSet = !pathOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 lastError = overrideSet ? strings().codexPathInvalid : strings().codexNotInstalled
+                lastErrorIsNetwork = false
                 return
             }
             do {
-                let fresh = try await CodexProbe.run(codexPath: path)
+                let fresh = try await probeRetryingNetworkFailures(codexPath: path)
                 checkpoints.recordCredits(from: usage?.windows ?? [], to: fresh.windows)
                 usage = fresh
                 lastError = nil
+                lastErrorIsNetwork = false
+            } catch CodexProbe.ProbeError.network {
+                lastError = CodexProbe.ProbeError.network.localizedDescription
+                lastErrorIsNetwork = true
             } catch {
                 lastError = error.localizedDescription
+                lastErrorIsNetwork = false
             }
             now = Date()
             evaluateAlerts()
         }
+    }
+
+    /// Network failures to chatgpt.com come in bursts of a few seconds to a minute, so a failed
+    /// read is retried a couple of times before waiting for the next poll.
+    private static let networkRetryDelays: [TimeInterval] = [10, 20]
+
+    private func probeRetryingNetworkFailures(codexPath: String) async throws -> CodexUsage {
+        for delay in Self.networkRetryDelays {
+            do {
+                return try await CodexProbe.run(codexPath: codexPath)
+            } catch CodexProbe.ProbeError.network {
+                try? await Task.sleep(for: .seconds(delay))
+            }
+        }
+        return try await CodexProbe.run(codexPath: codexPath)
     }
 
     /// Called when the menu opens: keep derived values current, and fetch if the numbers are old.
@@ -197,6 +220,10 @@ final class CodexStore: ObservableObject {
     func isIdle(_ kind: WindowKind) -> Bool {
         usage != nil && usage?.window(kind) == nil
     }
+
+    /// A network failure while a recent reading is still on screen: worth a note, not an alarm.
+    /// Once the reading goes stale the error is shown as one again.
+    var errorIsMinor: Bool { lastErrorIsNetwork && usage != nil && !isStale }
 
     var isStale: Bool {
         guard let usage else { return false }

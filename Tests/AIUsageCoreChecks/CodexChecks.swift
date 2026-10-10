@@ -11,6 +11,7 @@ enum CodexChecks {
         parsesBothWindows()
         skipsNotificationsAndOtherResponses()
         surfacesAnErrorResponse()
+        recognizesNetworkFailures()
         fallsBackToTheSingleBucketView()
         skipsWindowsOfUnknownLength()
         resetLandsInTheFollowingMinute()
@@ -50,9 +51,18 @@ enum CodexChecks {
             Harness.check(false, "error response should throw")
         } catch let error as CodexParser.ResponseError {
             Harness.equal(error.message, "not logged in", "error message")
+            Harness.check(!error.isNetworkFailure, "sign-in error is not a network failure")
         } catch {
             Harness.check(false, "unexpected error \(error)")
         }
+    }
+
+    static func recognizesNetworkFailures() {
+        // Verbatim from a real failure while chatgpt.com TLS handshakes were stalling.
+        let real = "failed to fetch codex rate limits: error sending request for url (https://chatgpt.com/backend-api/wham/usage)"
+        Harness.check(CodexParser.ResponseError(message: real).isNetworkFailure, "send failure is a network failure")
+        Harness.check(!CodexParser.ResponseError(message: "malformed rateLimits response").isNetworkFailure,
+                      "malformed response is not a network failure")
     }
 
     static func fallsBackToTheSingleBucketView() {

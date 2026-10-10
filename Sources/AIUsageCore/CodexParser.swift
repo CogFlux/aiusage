@@ -73,6 +73,22 @@ public enum CodexParser {
 
     public struct ResponseError: Error, Equatable {
         public var message: String
+
+        public init(message: String) {
+            self.message = message
+        }
+
+        /// True when Codex never got an HTTP answer from the backend (connect, TLS or DNS failure,
+        /// as reqwest words it). These come and go with the network, so they are worth retrying,
+        /// and they say nothing about being signed in.
+        public var isNetworkFailure: Bool {
+            let text = message.lowercased()
+            return Self.networkMarkers.contains { text.contains($0) }
+        }
+
+        private static let networkMarkers = [
+            "error sending request", "dns error", "tcp connect error", "connection reset", "timed out",
+        ]
     }
 
     /// The backend's `resetsAt` is not when the quota comes back. Readings of one window instance
