@@ -35,6 +35,7 @@ struct MenuContentView: View {
         }
         .padding(14)
         .frame(width: 360)
+        .background(PanelTopPin())
         .onAppear {
             deepseek.tick()
             codex.tick()
