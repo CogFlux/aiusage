@@ -78,6 +78,14 @@ out. Set a monthly budget to pace the month exactly like a Claude window (marker
 `42% ▲6`). The key is stored owner-only under `~/Library/Application Support/AIUsage/` and is sent only to
 `api.deepseek.com/user/balance`.
 
+## Sync
+
+Settings → Sync (off by default). Uploads the Claude and Codex windows, and optionally the DeepSeek balance,
+to a usage-mcp server, which shows them next to other balances and subscriptions
+and hands them to AI assistants over MCP. Needs the server address and a device token created on the server.
+Only changed numbers are sent (at most once a minute), plus a heartbeat every 15 minutes; the token is stored
+owner-only and sent only to that server. Details in [docs/data-contract.md](docs/data-contract.md) §6.
+
 ## Language
 
 The UI defaults to English. The menu offers English / 中文 / System (Chinese when the system's preferred

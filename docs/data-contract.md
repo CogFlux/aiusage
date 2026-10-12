@@ -373,3 +373,44 @@ Percentages are rounded to integers (half up). Countdown format: `45s` / `7m` / 
 
 See `Tests/AIUsageCoreChecks/`. `ParserChecks.streamJSON` is a real captured `rate_limit_event`;
 `statuslineJSON` comes from the official docs example. Reuse them directly when porting.
+
+## 6. Upload to a usage-mcp server (optional)
+
+Settings → Sync. Off by default. When a server URL (HTTPS; plain HTTP only for `localhost`) and a device
+token are set, readings go to `POST <server>/api/ingest` with `Authorization: Bearer <token>`. The token is
+kept in `~/Library/Application Support/AIUsage/sync.token` (0600) and sent only to that server; redirects are
+refused so it cannot leak to another host.
+
+```json
+{
+  "schema": 1,
+  "sentAt": "2026-10-12T12:00:05.000Z",
+  "readings": [{
+    "id": "claude:1791813600000",
+    "account": "claude",
+    "observedAt": "2026-10-12T12:00:00.000Z",
+    "metrics": [
+      { "key": "5h_used", "label": "5h", "kind": "percent", "sense": "used", "value": 42, "unit": "%",
+        "windowId": "2026-10-12T15:00:00.000Z", "resetsAt": "2026-10-12T15:00:00.000Z",
+        "observedAt": "2026-10-12T12:00:00.000Z" },
+      { "key": "7d_used", "label": "7d", "kind": "percent", "sense": "used", "value": 61, "unit": "%",
+        "windowId": "…", "resetsAt": "…", "observedAt": "2026-10-12T11:50:00.000Z",
+        "extra": { "creditAt": "…" } }
+    ]
+  }]
+}
+```
+
+- **When.** Claude: only after a live reading (probe, or a statusline write whose session's API time grew,
+  §2); idle re-emits are never uploaded as new readings. Codex: after each poll. DeepSeek: after each balance
+  read, only if an account is named for it. Unchanged values are re-sent at most every 15 minutes; uploads are
+  at least 60 s apart unless the user presses *Send now*. A heartbeat (`POST /api/ingest/heartbeat`) every 15
+  minutes tells the server the Mac is alive without making readings look fresh.
+- **Times.** `observedAt` per metric is the window's own observation time (a merged snapshot can hold windows
+  of different ages, §2); the reading's `observedAt` is the live reading that triggered the upload.
+- **Identity.** `id` is `<account>:<observedAt in ms>`, so a retry of the same observation is a duplicate, not
+  a second reading. `windowId` is the window's `resetsAt`; `creditAt` (§3) rides along in `extra`.
+- **Money** is in minor units (fen / cents) with an ISO 4217 `unit`; DeepSeek's `balance` is `total × 100`.
+- **Failures.** Readings wait in a queue of at most 50 (persisted) and are retried with exponential backoff
+  (1 min … 30 min). The server answers each reading with `accepted`, `duplicate` or `rejected:<reason>`; none of
+  those is retried. `401` stops uploads until a new token is saved; `400` drops the batch.

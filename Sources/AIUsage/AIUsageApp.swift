@@ -7,6 +7,7 @@ struct AIUsageApp: App {
     @StateObject private var deepseek: DeepSeekStore
     @StateObject private var codex: CodexStore
     @StateObject private var updater: Updater
+    @StateObject private var sync: SyncStore
 
     init() {
         // Debug entry point: `AIUsage --probe` runs one active query, prints the
@@ -31,12 +32,15 @@ struct AIUsageApp: App {
         _codex = StateObject(wrappedValue: codex)
         let updater = Updater()
         _updater = StateObject(wrappedValue: updater)
+        let sync = SyncStore(store: store, codex: codex, deepseek: deepseek)
+        _sync = StateObject(wrappedValue: sync)
         SettingsPresenter.configure(onOpen: { store.refreshNotificationStatus() }) { tab in
             SettingsView(tab: tab)
                 .environmentObject(store)
                 .environmentObject(deepseek)
                 .environmentObject(codex)
                 .environmentObject(updater)
+                .environmentObject(sync)
         }
     }
 

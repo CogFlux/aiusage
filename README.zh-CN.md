@@ -66,6 +66,12 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 并估算余额用尽日期。设置月预算后，本月会像 Claude 窗口一样做 pace（标记、通知、菜单栏 `42% ▲6`）。
 key 以仅本用户可读的权限保存在 `~/Library/Application Support/AIUsage/`，只会发送到 `api.deepseek.com/user/balance`。
 
+## 同步
+
+设置 → 同步（默认关闭）。把 Claude 和 Codex 的窗口（可选 DeepSeek 余额）上传到 usage-mcp 服务器，在那里和其他余额、
+订阅一起显示，并通过 MCP 提供给 AI 助手。需要填写服务器地址和在服务器上生成的设备令牌。只在数值变化时上传（最多每分钟一次），
+另外每 15 分钟发一次心跳；令牌以仅本人可读的权限保存，只发送给该服务器。详见 [docs/data-contract.md](docs/data-contract.md) §6。
+
 ## 语言
 
 界面默认英文；菜单底部可切换 English / 中文 / 跟随系统（系统首选语言以 `zh` 开头时用中文）。

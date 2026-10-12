@@ -192,6 +192,25 @@ struct Strings {
     let claudePathPlaceholder: String
     let quit: String
 
+    // Sync
+    let syncTab: String
+    let syncEnable: String
+    let syncEnableHint: String
+    let syncEndpoint: String
+    let syncInsecureEndpoint: String
+    let syncToken: String
+    let syncTokenHint: String
+    let syncTokenSaved: String
+    let syncTokenRejected: String
+    let syncAccounts: String
+    let syncAccountsHint: String
+    let syncAccountOff: String
+    let syncSendNow: String
+    let syncLastSent: (_ ago: String) -> String
+    let syncNeverSent: String
+    let syncQueued: (_ count: Int) -> String
+    let syncRejected: (_ detail: String) -> String
+
     /// Read by error types that have no access to the store. The store keeps it in sync.
     nonisolated(unsafe) static var current: Strings = .en
 
@@ -353,7 +372,25 @@ struct Strings {
         showInClaudeCodeHint: "Prints \"[Opus] ctx 20% · 5h 19% · 7d 17%\" in Claude Code's status line. Only applies when you had no status line of your own. Changes show up within about a minute — Claude Code re-runs the status line on its next response or its 60-second timer. No restart needed.",
         claudePath: "claude path",
         claudePathPlaceholder: "Not found — enter full path",
-        quit: "Quit"
+        quit: "Quit",
+
+        syncTab: "Sync",
+        syncEnable: "Upload to a usage server",
+        syncEnableHint: "Sends the Claude and Codex windows (and the DeepSeek balance, if you name an account for it) to your usage-mcp server whenever they change, at most once a minute, plus a heartbeat every 15 minutes. Nothing is sent anywhere else.",
+        syncEndpoint: "Server",
+        syncInsecureEndpoint: "The server address must start with https:// (http:// only for localhost).",
+        syncToken: "Device token",
+        syncTokenHint: "Create one on the server under Settings → Upload devices. Stored in ~/Library/Application Support/AIUsage/sync.token (owner-only) and sent only to the server above.",
+        syncTokenSaved: "Token saved",
+        syncTokenRejected: "The server rejected the device token (revoked or mistyped). Paste a new one.",
+        syncAccounts: "Server accounts",
+        syncAccountsHint: "The account slug on the server each provider's numbers go to. Leave one empty to not upload it.",
+        syncAccountOff: "not uploaded",
+        syncSendNow: "Send now",
+        syncLastSent: { "Last upload \($0)" },
+        syncNeverSent: "Nothing uploaded yet",
+        syncQueued: { "\($0) waiting" },
+        syncRejected: { "The server refused: \($0)" }
     )
 
     static let zh = Strings(
@@ -496,6 +533,24 @@ struct Strings {
         showInClaudeCodeHint: "在 Claude Code 状态栏打印 \"[Opus] ctx 20% · 5h 19% · 7d 17%\"。仅在你原本没有自己的状态栏时生效。切换后约一分钟内生效——Claude Code 在下一条回复或 60 秒定时器到时重跑状态栏。无需重启。",
         claudePath: "claude 路径",
         claudePathPlaceholder: "未找到，请填写完整路径",
-        quit: "退出"
+        quit: "退出",
+
+        syncTab: "同步",
+        syncEnable: "上传到用量服务器",
+        syncEnableHint: "Claude 和 Codex 的窗口（以及填写了账户时的 DeepSeek 余额）变化时上传到你的 usage-mcp 服务器，最多每分钟一次，另外每 15 分钟发一次心跳。不会发到其他任何地方。",
+        syncEndpoint: "服务器",
+        syncInsecureEndpoint: "服务器地址必须以 https:// 开头（仅 localhost 可用 http://）。",
+        syncToken: "设备令牌",
+        syncTokenHint: "在服务器的 设置 → 上传设备 里生成。保存在 ~/Library/Application Support/AIUsage/sync.token（仅本人可读），只发送给上面的服务器。",
+        syncTokenSaved: "令牌已保存",
+        syncTokenRejected: "服务器拒绝了设备令牌（已吊销或填错）。请粘贴新的令牌。",
+        syncAccounts: "服务器账户",
+        syncAccountsHint: "每个来源的数据写入服务器上的哪个账户标识。留空则不上传。",
+        syncAccountOff: "不上传",
+        syncSendNow: "立即发送",
+        syncLastSent: { "上次上传 \($0)" },
+        syncNeverSent: "尚未上传",
+        syncQueued: { "\($0) 条待发送" },
+        syncRejected: { "服务器拒绝：\($0)" }
     )
 }

@@ -5,7 +5,7 @@ import SwiftUI
 /// `SettingsPresenter` builds, the way macOS settings windows look.
 struct SettingsView: View {
     enum Tab: CaseIterable {
-        case general, claudeCode, codex, deepseek
+        case general, claudeCode, codex, deepseek, sync
 
         func title(_ s: Strings) -> String {
             switch self {
@@ -13,6 +13,7 @@ struct SettingsView: View {
             case .claudeCode: return s.claudeCode
             case .codex: return "Codex"
             case .deepseek: return "DeepSeek"
+            case .sync: return s.syncTab
             }
         }
 
@@ -22,6 +23,7 @@ struct SettingsView: View {
             case .claudeCode: return "terminal"
             case .codex: return "chevron.left.forwardslash.chevron.right"
             case .deepseek: return "creditcard"
+            case .sync: return "arrow.up.circle"
             }
         }
     }
@@ -33,6 +35,7 @@ struct SettingsView: View {
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var codex: CodexStore
     @EnvironmentObject var updater: Updater
+    @EnvironmentObject var sync: SyncStore
 
     private var s: Strings { store.strings }
 
@@ -43,6 +46,7 @@ struct SettingsView: View {
             case .claudeCode: claudeCodeTab
             case .codex: codexTab
             case .deepseek: deepseekTab
+            case .sync: syncTab
             }
         }
         // Opens at its natural size and follows the window when it is resized.
@@ -294,6 +298,77 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    // MARK: Sync
+
+    private var syncTab: some View {
+        Form {
+            Section {
+                Toggle(isOn: $sync.enabled) {
+                    Text(s.syncEnable)
+                    Text(s.syncEnableHint)
+                }
+            }
+
+            Section {
+                TextField(s.syncEndpoint, text: $sync.endpoint, prompt: Text(SyncStore.endpointPlaceholder))
+                    .font(.callout.monospaced())
+                if !sync.endpoint.isEmpty, !sync.endpointIsValid {
+                    Text(s.syncInsecureEndpoint).font(.caption).foregroundStyle(.red)
+                }
+                HStack {
+                    SecureField(s.syncToken, text: $sync.tokenDraft, prompt: Text(sync.hasToken ? "••••••••" : "usg_…"))
+                        .onSubmit(sync.saveTypedToken)
+                    Button(s.deepseekSave, action: sync.saveTypedToken).disabled(sync.tokenDraft.isEmpty)
+                }
+                Text(sync.tokenJustSaved ? s.syncTokenSaved : s.syncTokenHint)
+                    .font(.caption).foregroundStyle(sync.tokenJustSaved ? .green : .secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section {
+                TextField("Claude", text: $sync.claudeAccount, prompt: Text("claude"))
+                TextField("Codex", text: $sync.codexAccount, prompt: Text("codex"))
+                TextField("DeepSeek", text: $sync.deepseekAccount, prompt: Text(s.syncAccountOff))
+            } header: {
+                Text(s.syncAccounts)
+                Text(s.syncAccountsHint)
+            }
+
+            Section {
+                HStack(alignment: .top) {
+                    if let error = sync.lastError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(syncStatus).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if sync.isSending {
+                        ProgressView().controlSize(.small)
+                    }
+                    Button(s.syncSendNow) { sync.sendNow() }
+                        .disabled(!sync.enabled || !sync.hasToken || !sync.endpointIsValid || sync.isSending)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    /// "Last upload 3 min ago · 2 waiting"
+    private var syncStatus: String {
+        var parts: [String] = []
+        if let at = sync.lastSentAt {
+            let f = RelativeDateTimeFormatter()
+            f.locale = store.locale
+            f.unitsStyle = .short
+            parts.append(s.syncLastSent(f.localizedString(for: at, relativeTo: Date())))
+        } else {
+            parts.append(s.syncNeverSent)
+        }
+        if sync.queued > 0 { parts.append(s.syncQueued(sync.queued)) }
+        return parts.joined(separator: " · ")
     }
 
     private var claudeCodeTab: some View {
