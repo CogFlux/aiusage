@@ -59,3 +59,45 @@ enum UploadPayloadChecks {
         Harness.check(!UploadPayload.sameValues(a, c), "changed numbers")
     }
 }
+
+enum CodexSubscriptionChecks {
+    static func run() {
+        readsPlanClaimsFromTheIDToken()
+        planBecomesADateMetricWithNullValue()
+    }
+
+    /// A token with only the claims we read; header and signature are dummies.
+    static func token(_ claims: [String: Any]) -> String {
+        let payload = try! JSONSerialization.data(withJSONObject: ["https://api.openai.com/auth": claims])
+        let b64 = payload.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return "eyJhbGciOiJub25lIn0.\(b64).sig"
+    }
+
+    static func readsPlanClaimsFromTheIDToken() {
+        let auth = try! JSONSerialization.data(withJSONObject: ["auth_mode": "chatgpt", "tokens": ["id_token": token([
+            "chatgpt_plan_type": "plus",
+            "chatgpt_subscription_active_start": "2026-10-04T06:01:05+00:00",
+            "chatgpt_subscription_active_until": "2026-11-04T06:01:05+00:00",
+            "chatgpt_subscription_last_checked": "2026-10-05T12:07:58.676420+00:00",
+        ])]])
+        let sub = CodexSubscription.parse(authJSON: auth)
+        Harness.equal(sub?.plan, "plus", "plan")
+        Harness.equal(sub?.activeUntil, Date(timeIntervalSince1970: 1_793_772_065), "paid through")
+        Harness.check(CodexSubscription.parse(authJSON: Data("{\"OPENAI_API_KEY\":\"x\"}".utf8)) == nil, "API-key sign-in has no plan")
+        Harness.check(CodexSubscription.parse(idToken: "not-a-jwt") == nil, "malformed token")
+    }
+
+    static func planBecomesADateMetricWithNullValue() {
+        let at = Date(timeIntervalSince1970: 1_791_200_000)
+        let w = UsageWindow(kind: .fiveHour, usedPercent: 6, resetsAt: at.addingTimeInterval(3600), observedAt: at)
+        let sub = CodexSubscription(plan: "plus", activeStart: nil, activeUntil: Date(timeIntervalSince1970: 1_793_772_065))
+        let r = UploadPayload.rateLimits(account: "codex", windows: [w], observedAt: at, subscription: sub)
+        Harness.equal(r?.metrics.last?.key, "subscription", "plan metric appended")
+        Harness.equal(r?.metrics.last?.extra?["plan"], "Plus", "capitalised plan")
+        let data = try? UploadPayload.encode(UploadPayload.Body(sentAt: at, readings: [r!]))
+        let json = String(decoding: data ?? Data(), as: UTF8.self)
+        Harness.check(json.contains("\"value\":null"), "null value is written, not omitted")
+        Harness.check(json.contains("\"expiresAt\":\"2026-11-04T06:01:05.000Z\""), "expiresAt encoded")
+    }
+}

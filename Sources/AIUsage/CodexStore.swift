@@ -54,6 +54,9 @@ final class CodexStore: ObservableObject {
             }
         }
     }
+    /// Plan and paid-through date from the Codex sign-in's ID token; nil for API-key sign-ins or when
+    /// Codex keeps its credentials in the Keychain instead of auth.json.
+    @Published private(set) var subscription: CodexSubscription?
     @Published private(set) var now = Date()
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
@@ -91,7 +94,19 @@ final class CodexStore: ObservableObject {
         checkpoints = CheckpointBook(manual: CheckpointBook.decode(defaults.data(forKey: Keys.checkpoints)),
                                      restores: CheckpointBook.decode(defaults.data(forKey: Keys.restorePoints)))
         refreshPath()
+        subscription = Self.readSubscription()
         if enabled { startPolling() }
+    }
+
+    static var authFileURL: URL {
+        let home = ProcessInfo.processInfo.environment["CODEX_HOME"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex")
+        return home.appendingPathComponent("auth.json")
+    }
+
+    /// Reads only the plan claims; see `CodexSubscription`.
+    static func readSubscription() -> CodexSubscription? {
+        (try? Data(contentsOf: authFileURL)).flatMap(CodexSubscription.parse(authJSON:))
     }
 
     // MARK: Locating codex
@@ -147,6 +162,8 @@ final class CodexStore: ObservableObject {
             do {
                 let fresh = try await probeRetryingNetworkFailures(codexPath: path)
                 checkpoints.recordCredits(from: usage?.windows ?? [], to: fresh.windows)
+                // Before `usage`, so whoever observes the new usage also sees the current plan.
+                subscription = Self.readSubscription()
                 usage = fresh
                 lastError = nil
                 lastErrorIsNetwork = false

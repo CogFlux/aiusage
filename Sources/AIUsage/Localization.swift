@@ -134,6 +134,8 @@ struct Strings {
     let codexExited: (_ code: Int32, _ stderrTail: String) -> String
     let codexServerError: (_ message: String) -> String
     let codexNetworkError: String
+    /// "paid through Nov 4"
+    let codexPaidThrough: (_ date: String) -> String
 
     // Layout
     let layout: String
@@ -322,6 +324,7 @@ struct Strings {
         codexExited: { code, tail in "codex exited with code \(code)" + (tail.isEmpty ? "" : ": \(tail)") },
         codexServerError: { message in "Codex: \(message). If you are not signed in, run `codex login` in Terminal." },
         codexNetworkError: "Codex could not reach chatgpt.com (network error). It will try again at the next refresh.",
+        codexPaidThrough: { "renews \($0)" },
 
         layout: "Layout",
         layoutHint: "What the menu and the menu bar show, top to bottom and left to right.",
@@ -483,6 +486,7 @@ struct Strings {
         codexExited: { code, tail in "codex 退出码 \(code)" + (tail.isEmpty ? "" : "：\(tail)") },
         codexServerError: { message in "Codex：\(message)。如果尚未登录，请在终端运行 `codex login`。" },
         codexNetworkError: "Codex 无法连接 chatgpt.com（网络错误），下次刷新时会再试。",
+        codexPaidThrough: { "\($0) 续费" },
 
         layout: "显示内容与顺序",
         layoutHint: "主界面（菜单）和菜单栏显示哪些服务，按从上到下、从左到右的顺序。",

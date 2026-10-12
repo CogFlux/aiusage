@@ -136,7 +136,7 @@ final class SyncStore: ObservableObject {
     private func codexChanged(_ usage: CodexUsage) {
         guard codex.enabled else { return }
         enqueue(UploadPayload.rateLimits(account: codexAccount, windows: usage.windows, observedAt: usage.observedAt,
-                                         plan: usage.planType))
+                                         plan: usage.planType, subscription: codex.subscription))
     }
 
     private func deepseekChanged(_ balance: DeepSeekClient.Balance) {
@@ -208,7 +208,7 @@ final class SyncStore: ObservableObject {
         }
         if codex.enabled, let usage = codex.usage {
             enqueue(UploadPayload.rateLimits(account: codexAccount, windows: usage.windows, observedAt: usage.observedAt,
-                                             plan: usage.planType), force: true)
+                                             plan: usage.planType, subscription: codex.subscription), force: true)
         }
         lastAttemptAt = nil
         failures = 0

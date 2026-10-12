@@ -59,7 +59,8 @@ Gear icon in the menu → Settings window.
 Settings → Codex. Reads the 5-hour and weekly windows of your ChatGPT plan through the Codex CLI's own app server
 (`codex app-server`, request `account/rateLimits/read`) every 5 minutes and whenever the menu opens. It is a
 usage lookup, not a model request: free, and it uses no quota. The windows are paced exactly like Claude's and
-share its notification switches; the menu bar shows them in the same form, `5h 6% ●`. Requires the Codex CLI, signed in
+share its notification switches; the menu bar shows them in the same form, `5h 6% ●`. The plan and the date it is
+paid through come from the claims of the ID token Codex keeps in `~/.codex/auth.json`; only those claims are read. Requires the Codex CLI, signed in
 with a ChatGPT account (`codex login`). Details in [docs/data-contract.md](docs/data-contract.md).
 
 ## Layout

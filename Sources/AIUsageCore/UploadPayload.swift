@@ -12,9 +12,31 @@ public enum UploadPayload {
         public var unit: String
         public var windowId: String?
         public var resetsAt: Date?
+        /// For a "date" metric (a plan paid through a day).
+        public var expiresAt: Date?
         /// Per window: a merged snapshot can hold windows observed at different times.
         public var observedAt: Date?
         public var extra: [String: String]?
+
+        private enum CodingKeys: String, CodingKey {
+            case key, label, kind, sense, value, unit, windowId, resetsAt, expiresAt, observedAt, extra
+        }
+
+        /// `value` is always written, as null when absent: the server requires the key.
+        public func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(key, forKey: .key)
+            try c.encode(label, forKey: .label)
+            try c.encode(kind, forKey: .kind)
+            try c.encode(sense, forKey: .sense)
+            try c.encode(value, forKey: .value)
+            try c.encode(unit, forKey: .unit)
+            try c.encodeIfPresent(windowId, forKey: .windowId)
+            try c.encodeIfPresent(resetsAt, forKey: .resetsAt)
+            try c.encodeIfPresent(expiresAt, forKey: .expiresAt)
+            try c.encodeIfPresent(observedAt, forKey: .observedAt)
+            try c.encodeIfPresent(extra, forKey: .extra)
+        }
     }
 
     public struct Reading: Codable, Equatable, Sendable {
@@ -43,16 +65,24 @@ public enum UploadPayload {
 
     /// One metric per window, "5h_used" / "7d_used", identified by its reset time.
     public static func rateLimits(account: String, windows: [UsageWindow], observedAt: Date,
-                                  plan: String? = nil) -> Reading? {
+                                  plan: String? = nil, subscription: CodexSubscription? = nil) -> Reading? {
         guard !windows.isEmpty else { return nil }
-        let metrics = windows.sorted { $0.kind.duration < $1.kind.duration }.map { w -> Metric in
+        var metrics = windows.sorted { $0.kind.duration < $1.kind.duration }.map { w -> Metric in
             var extra: [String: String] = [:]
             if let credit = w.creditAt { extra["creditAt"] = iso(credit) }
             if let plan { extra["plan"] = plan }
             return Metric(key: "\(w.kind.shortLabel)_used", label: w.kind.shortLabel, kind: "percent", sense: "used",
                           value: (w.usedPercent * 10).rounded() / 10, unit: "%", windowId: iso(w.resetsAt),
-                          resetsAt: w.resetsAt, observedAt: min(w.observedAt, observedAt),
+                          resetsAt: w.resetsAt, expiresAt: nil, observedAt: min(w.observedAt, observedAt),
                           extra: extra.isEmpty ? nil : extra)
+        }
+        // The date the plan is paid through; the server moves the linked subscription's renewal to it.
+        if let until = subscription?.activeUntil {
+            var extra: [String: String] = [:]
+            if let p = subscription?.plan { extra["plan"] = p.prefix(1).uppercased() + p.dropFirst() }
+            if let start = subscription?.activeStart { extra["activeStart"] = iso(start) }
+            metrics.append(Metric(key: "subscription", label: "Plan", kind: "date", sense: "limit", value: nil, unit: "date",
+                                  expiresAt: until, extra: extra.isEmpty ? nil : extra))
         }
         return Reading(id: readingID(account: account, observedAt: observedAt), account: account,
                        observedAt: observedAt, metrics: metrics)

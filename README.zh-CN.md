@@ -51,7 +51,8 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 
 设置 → Codex。通过 Codex CLI 自带的 app server（`codex app-server`，请求 `account/rateLimits/read`）读取 ChatGPT
 套餐的 5 小时和每周窗口，每 5 分钟一次，打开菜单时也会刷新。这是用量查询而不是模型请求：免费，不消耗额度。
-两个窗口的 pace 算法与 Claude 完全相同，并共用同一组通知开关；菜单栏显示格式与 Claude 相同（`5h 6% ●`）。需要安装 Codex CLI
+两个窗口的 pace 算法与 Claude 完全相同，并共用同一组通知开关；菜单栏显示格式与 Claude 相同（`5h 6% ●`）。套餐和付费到期日
+来自 Codex 保存在 `~/.codex/auth.json` 里的 ID token 声明，只读取这几项声明。需要安装 Codex CLI
 并用 ChatGPT 账户登录（`codex login`）。细节见 [docs/data-contract.md](docs/data-contract.md)。
 
 ## 显示内容与顺序

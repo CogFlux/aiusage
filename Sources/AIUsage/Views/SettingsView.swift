@@ -249,7 +249,10 @@ struct SettingsView: View {
     private var codexSummary: String? {
         guard let usage = codex.usage else { return nil }
         let windows = usage.windows.map { "\($0.kind.shortLabel) \(UsageFormatter.percent($0.usedPercent))" }
-        return ([codex.planLabel].compactMap { $0 } + windows).joined(separator: " · ")
+        let until = codex.subscription?.activeUntil.map {
+            s.codexPaidThrough($0.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(store.locale)))
+        }
+        return ([codex.planLabel].compactMap { $0 } + windows + [until].compactMap { $0 }).joined(separator: " · ")
     }
 
     private var deepseekTab: some View {

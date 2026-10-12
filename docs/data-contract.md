@@ -411,6 +411,13 @@ refused so it cannot leak to another host.
 - **Identity.** `id` is `<account>:<observedAt in ms>`, so a retry of the same observation is a duplicate, not
   a second reading. `windowId` is the window's `resetsAt`; `creditAt` (§3) rides along in `extra`.
 - **Money** is in minor units (fen / cents) with an ISO 4217 `unit`; DeepSeek's `balance` is `total × 100`.
+- **Codex plan.** The Codex reading carries one more metric, `{ "key": "subscription", "kind": "date",
+  "sense": "limit", "value": null, "unit": "date", "expiresAt": <paid through>, "extra": { "plan": "Plus",
+  "activeStart": … } }`, read from the claims `chatgpt_plan_type`, `chatgpt_subscription_active_start` and
+  `chatgpt_subscription_active_until` (under `https://api.openai.com/auth`) of the ID token in
+  `$CODEX_HOME/auth.json` (default `~/.codex/auth.json`). Only those claims are read; the token is not used or
+  sent. Absent for API-key sign-ins or when Codex stores its credentials in the Keychain. The claims are as
+  fresh as the token, which Codex refreshes from time to time. `value` is always written (as `null` here).
 - **Failures.** Readings wait in a queue of at most 50 (persisted) and are retried with exponential backoff
   (1 min … 30 min). The server answers each reading with `accepted`, `duplicate` or `rejected:<reason>`; none of
   those is retried. `401` stops uploads until a new token is saved; `400` drops the batch.
