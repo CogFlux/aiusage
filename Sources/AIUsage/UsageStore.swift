@@ -152,6 +152,8 @@ final class UsageStore: ObservableObject {
 
     private var watcher: DirectoryWatcher?
     private var ticker: Timer?
+    /// Modification time of the desktop app's usage history when it was last read.
+    private var desktopHistoryReadAt: Date?
 
     init(notifier: Notifier) {
         self.notifier = notifier
@@ -207,6 +209,7 @@ final class UsageStore: ObservableObject {
 
     private func tick() {
         now = Date()
+        reloadFromDesktop()
         evaluateAlerts()
         if notifyOverPace || notifyRunningOut || notifyWindowReset || notifyQuotaRestored {
             refreshNotificationStatus()
@@ -405,7 +408,46 @@ final class UsageStore: ObservableObject {
         snapshot = snapshot?.merging(incoming, provenance: provenance) ?? incoming
         now = Date()
         recordQuotaRestores(since: previous)
+        // A new window instance may make an already-read desktop sample placeable.
+        reloadFromDesktop(force: true)
         evaluateAlerts()
+    }
+
+    // MARK: Passive source (desktop app history)
+
+    static let desktopHistoryURL = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Claude/plan-usage-history.json")
+
+    /// Desktop Code sessions never run the statusline hook, so the desktop app's own usage history
+    /// is the only free trace of what they spend. Polled on the clock tick rather than watched: its
+    /// folder is a browser profile and changes constantly.
+    private func reloadFromDesktop(force: Bool = false) {
+        let url = Self.desktopHistoryURL
+        guard let current = snapshot,
+              let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
+              force || mtime != desktopHistoryReadAt else { return }
+        desktopHistoryReadAt = mtime
+        guard let org = Self.claudeCodeOrganization(),
+              let data = try? Data(contentsOf: url),
+              let sample = DesktopHistoryParser.latest(data, org: org),
+              let updated = current.applying(sample), updated.windows != current.windows else { return }
+        if sample.observedAt > (lastLive?.at ?? .distantPast) {
+            lastLive = LiveReading(source: .desktop, at: sample.observedAt)
+        }
+        snapshot = updated
+        now = Date()
+        recordQuotaRestores(since: current)
+    }
+
+    /// The organization Claude Code is signed in to. The desktop history mixes every organization the
+    /// app has used; only this one's samples describe the windows the statusline and the probe report.
+    private static func claudeCodeOrganization() -> String? {
+        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
+        guard let data = try? Data(contentsOf: url),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let account = root["oauthAccount"] as? [String: Any] else { return nil }
+        return account["organizationUuid"] as? String
     }
 
     /// A quota reset credit zeroes usage without changing `resetsAt`. Two consequences: any

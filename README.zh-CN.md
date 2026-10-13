@@ -21,8 +21,9 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 |---|---|---|
 | **Claude Code statusline 钩子**（默认） | 0 | 有会话在跑时实时；空闲时每 60s 刷一次 |
 | **主动查询**（菜单里 "Claude" 右侧的 ↻，悬停可看成本说明） | 一次极小的 Haiku 请求，约 500 tokens ≈ $0.001 API 等价；Pro / Max 套餐内不另收费 | 即时 |
+| **Claude 桌面端用量记录**（兜底） | 0 | 随桌面端采样，通常每 15 分钟；只能更新前两条已报告过的窗口 |
 
-两条路都走 Claude Code 官方暴露的接口，不碰 OAuth token，不抓网页。细节见 [docs/data-contract.md](docs/data-contract.md)。
+前两条走 Claude Code 官方暴露的接口。桌面端（Code 标签页）的会话不会运行 statusline 钩子，所以它们的用量从桌面端本地保存的用量记录里读取；该文件没有官方文档，只作兜底。不碰 OAuth token，不抓网页。细节见 [docs/data-contract.md](docs/data-contract.md)。
 
 主动查询的副作用：如果当前没有活跃的 5h 窗口，它会开启一个新窗口。
 

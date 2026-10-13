@@ -52,6 +52,8 @@ public enum SnapshotSource: String, Codable, Sendable {
     case statusline
     /// Result of an explicit `claude -p` probe (active, costs one tiny request).
     case probe
+    /// Read from the Claude desktop app's own usage history (passive, free, no reset times).
+    case desktop
 }
 
 /// Where a quota credit landed, kept per window instance so it survives the display switching to
@@ -126,7 +128,7 @@ public struct SessionTracker: Codable, Equatable, Sendable {
     public init() {}
 
     public mutating func provenance(of snapshot: UsageSnapshot) -> Provenance {
-        if snapshot.source == .probe { return .fresh }
+        if snapshot.source != .statusline { return .fresh }
         // Without a session stamp (older Claude Code) nothing can be told apart.
         guard let session = snapshot.session else { return .stale(lastFreshAt: nil) }
         let at = snapshot.observedAt
@@ -224,7 +226,7 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     public func merging(_ incoming: UsageSnapshot, provenance: Provenance? = nil,
                         policy: MergePolicy = MergePolicy()) -> UsageSnapshot {
         guard incoming.observedAt >= observedAt else { return self }
-        let origin = provenance ?? (incoming.source == .probe ? .fresh : .stale(lastFreshAt: nil))
+        let origin = provenance ?? (incoming.source == .statusline ? .stale(lastFreshAt: nil) : .fresh)
         let tolerance = policy.sameInstanceTolerance
         var credits = (credits ?? []).filter { $0.resetsAt > incoming.observedAt }
         func mark(_ window: UsageWindow) -> Int? {

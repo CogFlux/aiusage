@@ -39,6 +39,7 @@ struct Strings {
     let waitingForData: String
     let sourceStatusline: String
     let sourceProbe: String
+    let sourceDesktop: String
 
     // Windows
     let fiveHourTitle: String
@@ -238,6 +239,7 @@ struct Strings {
         waitingForData: "Waiting for data",
         sourceStatusline: "statusline",
         sourceProbe: "probe",
+        sourceDesktop: "desktop app",
 
         fiveHourTitle: "5-hour window",
         sevenDayTitle: "7-day window",
@@ -400,6 +402,7 @@ struct Strings {
         waitingForData: "等待数据",
         sourceStatusline: "statusline",
         sourceProbe: "主动查询",
+        sourceDesktop: "桌面端",
 
         fiveHourTitle: "5 小时窗口",
         sevenDayTitle: "7 天窗口",
