@@ -91,43 +91,65 @@ Notes:
   and inject it into the child process environment explicitly.
 - Remove `CLAUDECODE` / `CLAUDE_CODE_ENTRYPOINT` from the environment, or a nested launch may be refused.
 
-### 1.3 Passive fallback: Claude desktop app usage history (free, no reset times)
+### 1.3 Opt-in: OAuth usage endpoint (off by default, free)
 
-Claude Code sessions in the desktop app (Code tab) run the CLI in `--output-format stream-json` mode, which
-never calls `statusLine.command`; their `rate_limit_event`s go to the desktop app over a pipe. Usage spent there
-is invisible to §1.1 (verified 2026-10-14 with desktop app CLI 2.1.295). The desktop app keeps its own record:
+The endpoint behind Claude Code's `/usage` screen, called with Claude Code's own sign-in token. It is the only
+source that also sees usage spent in the Claude desktop app (whose Code sessions run the CLI in stream-json mode
+and never call the statusline hook) and on claude.ai. Same approach as CodexBar's default Claude source.
+
+**Off by default**, because it is undocumented and Anthropic's terms reserve Pro/Max sign-in tokens for Claude
+Code and claude.ai (see §1.5). The Settings toggle says so; turning it on is the user's call.
+
+Token: generic password item, service `Claude Code-credentials`, holding
+`{"claudeAiOauth":{"accessToken":"…","expiresAt":<unix ms>,…}}`. Only `accessToken` and `expiresAt` are read.
+
+- Reading another app's item raises the Keychain's Allow/Deny prompt. Only user actions (turning the option on,
+  ↻) may show it; background reads pass `LAContext.interactionNotAllowed` plus `kSecUseAuthenticationUIFail` and
+  report "needs approval" instead. The app is ad-hoc signed, so "Always Allow" may need repeating after an update.
+- The token is never stored, logged or renewed. Renewal rotates the refresh token and would sign Claude Code out;
+  an expired token (`expiresAt` within 60 s) is reported and left for Claude Code to renew.
 
 ```
-~/Library/Application Support/Claude/plan-usage-history.json
+GET https://api.anthropic.com/api/oauth/usage
+Authorization: Bearer <accessToken>
+anthropic-beta: oauth-2025-04-20
+User-Agent: claude-cli/<version> (external, cli)
 ```
+
+The User-Agent is the one CodexBar sends: `<version>` is the first word of `claude --version`, read once per
+launch, with CodexBar's fallback `2.1.0` when it cannot be read.
 
 ```json
-{"version":2,"samples":[{"t":1789342242507,"org":"<organization uuid>","u":{"fh":10,"sd":20}}]}
+{"five_hour":{"utilization":25.0,"resets_at":"2026-10-14T03:19:59.686376+00:00"},
+ "seven_day":{"utilization":29.0,"resets_at":"2026-10-19T13:59:59.686397+00:00"},
+ "seven_day_sonnet":{"…":"ignored"},"extra_usage":{"…":"ignored"}}
 ```
 
 | Field | Type | Notes |
 |---|---|---|
-| `t` | number | Unix **milliseconds**, when the app fetched the numbers |
-| `org` | string | Organization UUID; the file holds every organization the app has been signed in to |
-| `u.fh` / `u.sd` | number | 5-hour / 7-day used percentage, **0–100**, whole numbers; `u` may be empty |
+| `utilization` | number | **0–100** already |
+| `resets_at` | string | ISO 8601, fraction of any length; parsed to the second. `null` when no window is running: the window is left out |
 
-Undocumented and internal to the desktop app, so it is read defensively: any `version` other than 2 means no
-data. Samples are usually 15 minutes apart, with gaps of hours or days while the app is not sampling, and
-there is **no reset time**. Hence:
+401/403 mean the token was rejected; 429 backs off until `Retry-After` (10 min without one).
 
-- Only samples whose `org` equals Claude Code's `oauthAccount.organizationUuid` (in `~/.claude.json`) are used,
-  and of those only the newest that carries a window.
-- A sample can only update a window instance already held from §1.1 or §1.2, borrowing its `resetsAt`, and only
-  when the sample falls inside that instance (`startsAt < t < resetsAt`) and is newer than the held reading
-  of that window. It never starts a window on its own: once the held instance ends, the fallback is silent
-  until the statusline or a probe reports the next one.
-- It is a server value, so it is fresh (§2). The app polls the file's mtime every 30 s and re-checks after
-  every other merge; the folder is a browser profile and too busy to watch.
+Cadence (`RefreshPolicy`, after CodexBar's adaptive mode), each wait scaled by a random 0.9–1.1:
+
+| Condition | Wait |
+|---|---:|
+| Low Power Mode, or thermal state serious/critical | 30 min |
+| Menu opened at most 5 min ago | 2 min |
+| Menu opened within the hour | 5 min |
+| Menu opened 1–4 h ago | 15 min |
+| Never opened, or 4+ h ago | 30 min |
+
+Opening the menu re-evaluates at once, so a reading older than 2 minutes is refreshed on open. While the option
+is on, ↻ queries this endpoint instead of running the §1.2 probe.
 
 ### 1.4 Windows not covered
 
 Claude Code's `/usage` screen also shows a separate weekly quota for Claude Fable on Max plans. Neither
-path here exposes it: the statusline JSON only ever carries `five_hour` and `seven_day`, and a Haiku probe's
+the statusline nor the probe exposes it (the §1.3 response may, in a `limits` array of `weekly_scoped` entries,
+which is not read yet): the statusline JSON only ever carries `five_hour` and `seven_day`, and a Haiku probe's
 `rate_limit_event` has the same two windows. A probe made **with the Fable model** additionally returns a
 `seven_day_overage_included` window, whose meaning is undocumented and which would cost roughly ten times a
 Haiku probe (~$0.01 API-equivalent per query). Not worth it; the Fable quota is out of scope until Claude Code
@@ -135,8 +157,9 @@ exposes it through the statusline.
 
 ### 1.5 Sources deliberately not used
 
-- The OAuth token in the `Claude Code-credentials` Keychain item → `/api/oauth/usage`: undocumented, and
-  Anthropic explicitly disallows third-party tools from using subscription OAuth.
+- The OAuth token in the `Claude Code-credentials` Keychain item → `/api/oauth/usage` **by default**:
+  undocumented, and Anthropic explicitly disallows third-party tools from using subscription OAuth. Offered only
+  as the opt-in §1.3.
 - claude.ai web endpoints / cookies: violates the consumer terms of service.
 
 ### 1.6 DeepSeek (prepaid balance)
@@ -223,7 +246,7 @@ WindowKind   = five_hour | seven_day
 UsageWindow  { kind, usedPercent: 0–100, resetsAt: timestamp }
   startsAt   = resetsAt − duration          (Claude only reports the reset time; the start is derived)
 
-UsageSnapshot { provider: "claude", source: statusline | probe | desktop, observedAt, windows: [UsageWindow] }
+UsageSnapshot { provider: "claude", source: statusline | probe | oauth, observedAt, windows: [UsageWindow] }
 
 PaceWindow   { id, usedPercent: 0–100, startsAt, resetsAt, tolerance, runningOutLead }
              — the generic input to PaceCalculator and AlertTracker. Claude windows map onto it
@@ -239,8 +262,7 @@ property of the source, not a bug; do not "correct" for it.
 
 Merge rule (`UsageSnapshot.merging` with `MergePolicy`), applied whenever a new observation arrives:
 
-1. An observation older than the current snapshot is ignored entirely. A desktop sample (§1.3) is ordered
-   per window instead, since idle sessions keep moving the snapshot's own time past it.
+1. An observation older than the current snapshot is ignored entirely.
 2. Per window, a `resetsAt` more than 120 s away is another instance: usually the next one after a reset,
    but sessions signed in to different accounts (after a `/login`) report different windows side by side,
    and neither reset time says which account is in use. So another instance is taken when the reading is
@@ -261,7 +283,7 @@ leaves `resets_at` untouched** (confirmed 2026-09-28). The size of a drop cannot
 idle session, so the merge asks instead whether the reading is *fresh* — straight from an API response —
 using `SessionTracker`:
 
-- The probe is always fresh, and so is a desktop sample.
+- The probe and the OAuth endpoint are always fresh.
 - A statusline write is fresh when its writer's `total_api_duration_ms` has grown since that writer's
   previous write. A writer is a process, not a session: two terminals that resumed the same session write
   under one `session_id` with separate totals (seen live), so writers are told apart by their start time,

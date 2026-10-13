@@ -32,6 +32,7 @@ final class UsageStore: ObservableObject {
         static let sessionTracker = "sessionTracker"
         static let alertTracker = "alertTracker"
         static let lastLive = "lastLiveReading"
+        static let oauthQuery = "claudeOAuthQuery"
     }
 
     /// Persisted, so a restart does not begin by believing whichever session happened to write the
@@ -86,6 +87,19 @@ final class UsageStore: ObservableObject {
             case .en: defaults.set(["en"], forKey: "AppleLanguages")
             case .zh: defaults.set(["zh-Hans"], forKey: "AppleLanguages")
             }
+        }
+    }
+
+    /// Opt-in: query the OAuth usage endpoint with Claude Code's sign-in instead of `claude -p`,
+    /// and do so in the background as well. See `ClaudeOAuthClient`.
+    @Published var oauthQueryEnabled: Bool {
+        didSet {
+            guard oauthQueryEnabled != oldValue else { return }
+            UserDefaults.standard.set(oauthQueryEnabled, forKey: Keys.oauthQuery)
+            oauthBlockedUntil = nil
+            probeState = .idle
+            // Turning it on is a user action: the right moment for the Keychain prompt.
+            if oauthQueryEnabled { queryOAuth(interactive: true) }
         }
     }
 
@@ -152,8 +166,13 @@ final class UsageStore: ObservableObject {
 
     private var watcher: DirectoryWatcher?
     private var ticker: Timer?
-    /// Modification time of the desktop app's usage history when it was last read.
-    private var desktopHistoryReadAt: Date?
+    private var oauthAttemptAt: Date?
+    /// Drawn once per attempt from `RefreshPolicy.jitter`, so the wait does not wobble between ticks.
+    private var oauthJitter = 1.0
+    /// The background cadence speeds up while the user is looking; see `RefreshPolicy`.
+    private var menuOpenedAt: Date?
+    /// Set by a 429; no background query before then.
+    private var oauthBlockedUntil: Date?
 
     init(notifier: Notifier) {
         self.notifier = notifier
@@ -171,6 +190,7 @@ final class UsageStore: ObservableObject {
         let storedLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
         language = storedLanguage
         compactMenuBar = defaults.bool(forKey: Keys.compactMenuBar)
+        oauthQueryEnabled = defaults.bool(forKey: Keys.oauthQuery)
         showInClaudeCode = HookInstaller.showsLineInClaudeCode
         notifyOverPace = defaults.bool(forKey: Keys.notifyOverPace)
         notifyRunningOut = defaults.bool(forKey: Keys.notifyRunningOut)
@@ -201,6 +221,7 @@ final class UsageStore: ObservableObject {
         refreshClaudePath()
         reloadFromFile()
         startWatching()
+        if oauthQueryEnabled { queryOAuth(interactive: false) }
 
         ticker = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -209,7 +230,7 @@ final class UsageStore: ObservableObject {
 
     private func tick() {
         now = Date()
-        reloadFromDesktop()
+        queryOAuthIfDue()
         evaluateAlerts()
         if notifyOverPace || notifyRunningOut || notifyWindowReset || notifyQuotaRestored {
             refreshNotificationStatus()
@@ -408,46 +429,7 @@ final class UsageStore: ObservableObject {
         snapshot = snapshot?.merging(incoming, provenance: provenance) ?? incoming
         now = Date()
         recordQuotaRestores(since: previous)
-        // A new window instance may make an already-read desktop sample placeable.
-        reloadFromDesktop(force: true)
         evaluateAlerts()
-    }
-
-    // MARK: Passive source (desktop app history)
-
-    static let desktopHistoryURL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Claude/plan-usage-history.json")
-
-    /// Desktop Code sessions never run the statusline hook, so the desktop app's own usage history
-    /// is the only free trace of what they spend. Polled on the clock tick rather than watched: its
-    /// folder is a browser profile and changes constantly.
-    private func reloadFromDesktop(force: Bool = false) {
-        let url = Self.desktopHistoryURL
-        guard let current = snapshot,
-              let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
-              force || mtime != desktopHistoryReadAt else { return }
-        desktopHistoryReadAt = mtime
-        guard let org = Self.claudeCodeOrganization(),
-              let data = try? Data(contentsOf: url),
-              let sample = DesktopHistoryParser.latest(data, org: org),
-              let updated = current.applying(sample), updated.windows != current.windows else { return }
-        if sample.observedAt > (lastLive?.at ?? .distantPast) {
-            lastLive = LiveReading(source: .desktop, at: sample.observedAt)
-        }
-        snapshot = updated
-        now = Date()
-        recordQuotaRestores(since: current)
-    }
-
-    /// The organization Claude Code is signed in to. The desktop history mixes every organization the
-    /// app has used; only this one's samples describe the windows the statusline and the probe report.
-    private static func claudeCodeOrganization() -> String? {
-        let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
-        guard let data = try? Data(contentsOf: url),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let account = root["oauthAccount"] as? [String: Any] else { return nil }
-        return account["organizationUuid"] as? String
     }
 
     /// A quota reset credit zeroes usage without changing `resetsAt`. Two consequences: any
@@ -470,6 +452,10 @@ final class UsageStore: ObservableObject {
 
     func probe() {
         guard probeState != .running else { return }
+        if oauthQueryEnabled {
+            queryOAuth(interactive: true)
+            return
+        }
         probeState = .running
         let env = HookInstaller.settingsEnv()
         Task {
@@ -483,6 +469,50 @@ final class UsageStore: ObservableObject {
                 merge(snap)
                 probeState = .idle
             } catch {
+                probeState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: Active source (OAuth usage endpoint, opt-in)
+
+    /// `interactive` marks a user action: it shows the spinner and may raise the Keychain prompt.
+    /// A background run stays silent unless it fails.
+    private func queryOAuthIfDue() {
+        guard oauthQueryEnabled, probeState != .running, now >= (oauthBlockedUntil ?? .distantPast) else { return }
+        let info = ProcessInfo.processInfo
+        let constrained = info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
+        let wait = RefreshPolicy.delay(now: now, lastMenuOpenAt: menuOpenedAt, constrained: constrained) * oauthJitter
+        if now.timeIntervalSince(oauthAttemptAt ?? .distantPast) >= wait {
+            queryOAuth(interactive: false)
+        }
+    }
+
+    /// The menu just opened: the cadence tightens to two minutes, so an older reading is refreshed now.
+    func menuOpened() {
+        menuOpenedAt = Date()
+        now = Date()
+        queryOAuthIfDue()
+    }
+
+    private func queryOAuth(interactive: Bool) {
+        oauthAttemptAt = Date()
+        oauthJitter = Double.random(in: RefreshPolicy.jitter)
+        if interactive { probeState = .running }
+        Task {
+            do {
+                let snap = try await ClaudeOAuthClient.fetch(interactive: interactive,
+                                                             claudePath: await lookUpClaudePath())
+                // Switched off while the request was in flight.
+                guard oauthQueryEnabled else { return }
+                oauthBlockedUntil = nil
+                merge(snap)
+                probeState = .idle
+            } catch {
+                guard oauthQueryEnabled else { return }
+                if case let .rateLimited(until) = error as? ClaudeOAuthClient.OAuthError {
+                    oauthBlockedUntil = until
+                }
                 probeState = .failed(error.localizedDescription)
             }
         }

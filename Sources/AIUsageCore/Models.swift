@@ -1,7 +1,7 @@
 import Foundation
 
-/// A rate-limit window as Claude exposes it. Both known data sources
-/// (statusline JSON and `claude -p` stream-json) report the same two windows.
+/// A rate-limit window as Claude exposes it. Every data source (statusline JSON, `claude -p`
+/// stream-json, the OAuth usage endpoint) reports these two windows.
 public enum WindowKind: String, Codable, CaseIterable, Hashable, Sendable {
     case fiveHour = "five_hour"
     case sevenDay = "seven_day"
@@ -52,8 +52,8 @@ public enum SnapshotSource: String, Codable, Sendable {
     case statusline
     /// Result of an explicit `claude -p` probe (active, costs one tiny request).
     case probe
-    /// Read from the Claude desktop app's own usage history (passive, free, no reset times).
-    case desktop
+    /// Read from the OAuth usage endpoint with Claude Code's sign-in token (opt-in, free).
+    case oauth
 }
 
 /// Where a quota credit landed, kept per window instance so it survives the display switching to
@@ -220,7 +220,7 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     }
 
     /// Combine with a newer observation; see `MergePolicy` for how one window is decided.
-    /// `provenance` defaults to what the source alone implies: a probe is fresh, a statusline
+    /// `provenance` defaults to what the source alone implies: a probe or OAuth reading is fresh, a statusline
     /// write of unknown origin is not.
     /// A window missing from `incoming` is kept only while it is still live.
     public func merging(_ incoming: UsageSnapshot, provenance: Provenance? = nil,

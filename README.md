@@ -22,11 +22,12 @@ how much actually is, whether you are ahead or behind, and when you would run ou
 |---|---|---|
 | **Claude Code statusline hook** (default) | none | live while a session is running; refreshed every 60s when idle |
 | **Query now** (↻ next to "Claude" in the menu; hover for the cost) | one tiny Haiku request, ~500 tokens ≈ $0.001 API-equivalent; covered by a Pro or Max subscription | instant |
-| **Claude desktop app usage history** (fallback) | none | as often as the desktop app samples, usually every 15 min; can only update a window the other two already reported |
+| **OAuth query** (opt-in, off by default: Settings → Claude Code) | none | every 2–30 min depending on how recently you opened the menu, and on ↻ |
 
-The first two use interfaces Claude Code exposes officially. Desktop app (Code tab) sessions never run the
-statusline hook, so their usage is picked up from the usage history the desktop app keeps locally; that file
-is undocumented and read only as a fallback. No OAuth tokens, no web scraping.
+The first two use interfaces Claude Code exposes officially. The OAuth query reads Claude Code's sign-in token
+from the Keychain and calls the undocumented endpoint behind Claude Code's `/usage` screen. It is the only source that
+also sees usage from the Claude desktop app and claude.ai, but Anthropic's terms reserve Pro/Max sign-in tokens for
+Claude Code and claude.ai, so it stays off unless you turn it on. No web scraping.
 Details in [docs/data-contract.md](docs/data-contract.md).
 
 Side effect of Query now: if no 5-hour window is currently active, the request starts a new one.

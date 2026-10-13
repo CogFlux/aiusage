@@ -403,6 +403,13 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle(isOn: $store.oauthQueryEnabled) {
+                    Text(s.oauthEnable)
+                    Text(s.oauthEnableHint)
+                }
+            }
+
+            Section {
                 TextField(s.claudePath, text: $store.claudePathOverride,
                           prompt: Text(store.resolvedClaudePath ?? s.claudePathPlaceholder))
                     .font(.callout.monospaced())

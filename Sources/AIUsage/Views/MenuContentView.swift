@@ -37,6 +37,7 @@ struct MenuContentView: View {
         .frame(width: 360)
         .background(PanelTopPin())
         .onAppear {
+            store.menuOpened()
             deepseek.tick()
             codex.tick()
             // Picks up a `claude` installed since the last look.
@@ -101,7 +102,7 @@ struct MenuContentView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-            .help(s.probeNow + " — " + s.probeHint)
+            .help(s.probeNow + " — " + (store.oauthQueryEnabled ? s.oauthRefreshHint : s.probeHint))
             .disabled(store.probeState == .running)
         }
     }
@@ -125,7 +126,7 @@ struct MenuContentView: View {
         switch source {
         case .statusline: return s.sourceStatusline
         case .probe: return s.sourceProbe
-        case .desktop: return s.sourceDesktop
+        case .oauth: return s.sourceOAuth
         }
     }
 

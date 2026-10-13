@@ -39,7 +39,7 @@ struct Strings {
     let waitingForData: String
     let sourceStatusline: String
     let sourceProbe: String
-    let sourceDesktop: String
+    let sourceOAuth: String
 
     // Windows
     let fiveHourTitle: String
@@ -80,6 +80,21 @@ struct Strings {
     let probeNotLoggedIn: String
     let probeExited: (_ code: Int32, _ stderrTail: String) -> String
     let probeNoEvent: String
+
+    // OAuth query
+    let oauthEnable: String
+    let oauthEnableHint: String
+    let oauthRefreshHint: String
+    let oauthNoCredentials: String
+    let oauthKeychainNeedsApproval: String
+    let oauthKeychainDenied: String
+    let oauthKeychainError: (_ status: Int32) -> String
+    let oauthTokenExpired: String
+    let oauthUnauthorized: (_ status: Int) -> String
+    let oauthRateLimited: String
+    let oauthServerError: (_ status: Int) -> String
+    let oauthNetworkError: String
+    let oauthNoData: String
 
     // Hook
     let hookInstalled: String
@@ -239,7 +254,7 @@ struct Strings {
         waitingForData: "Waiting for data",
         sourceStatusline: "statusline",
         sourceProbe: "probe",
-        sourceDesktop: "desktop app",
+        sourceOAuth: "OAuth",
 
         fiveHourTitle: "5-hour window",
         sevenDayTitle: "7-day window",
@@ -274,6 +289,20 @@ struct Strings {
         probeNotLoggedIn: "Claude Code is installed but not signed in. Open Terminal, run `claude`, and sign in with your Claude Pro or Max account.",
         probeExited: { code, tail in "claude exited with code \(code)" + (tail.isEmpty ? "" : ": \(tail)") },
         probeNoEvent: "No rate_limit_event in output (API-key accounts have no subscription quota)",
+
+        oauthEnable: "Query usage with Claude Code's sign-in (OAuth)",
+        oauthEnableHint: "Off by default. In the background (every 2 minutes while you have the menu open, slowing to every 30 when you haven't looked for hours) and when you click ↻, AIUsage reads Claude Code's sign-in token from the Keychain (macOS asks first: choose Always Allow; it may ask again after an AIUsage update) and asks Anthropic's usage endpoint, the one behind Claude Code's /usage screen. Free: no tokens, never starts a 5-hour window, and it also sees usage from the desktop app and claude.ai. The endpoint is undocumented, and Anthropic's terms reserve Pro and Max sign-in tokens for Claude Code and claude.ai: use at your own risk. AIUsage never stores or renews the token.",
+        oauthRefreshHint: "Asks the OAuth usage endpoint. Free; never starts a 5-hour window.",
+        oauthNoCredentials: "No Claude Code sign-in in the Keychain. Run `claude` in Terminal and sign in.",
+        oauthKeychainNeedsApproval: "AIUsage needs permission to read Claude Code's sign-in. Click ↻ and choose Always Allow.",
+        oauthKeychainDenied: "Reading Claude Code's sign-in was denied. Click ↻ to be asked again.",
+        oauthKeychainError: { "Couldn't read the Keychain (error \($0))." },
+        oauthTokenExpired: "Claude Code's sign-in token has expired. Claude Code renews it the next time it runs; use it once, then try again.",
+        oauthUnauthorized: { "The usage endpoint rejected Claude Code's sign-in (HTTP \($0)). Use Claude Code once so it renews, then try again." },
+        oauthRateLimited: "Too many requests to the usage endpoint; AIUsage will try again later.",
+        oauthServerError: { "The usage endpoint returned HTTP \($0)." },
+        oauthNetworkError: "Couldn't reach api.anthropic.com.",
+        oauthNoData: "The usage endpoint returned no 5-hour or 7-day window.",
 
         hookInstalled: "Statusline hook installed",
         hookNotInstalled: "Statusline hook not installed",
@@ -402,7 +431,7 @@ struct Strings {
         waitingForData: "等待数据",
         sourceStatusline: "statusline",
         sourceProbe: "主动查询",
-        sourceDesktop: "桌面端",
+        sourceOAuth: "OAuth",
 
         fiveHourTitle: "5 小时窗口",
         sevenDayTitle: "7 天窗口",
@@ -437,6 +466,20 @@ struct Strings {
         probeNotLoggedIn: "已安装 Claude Code 但尚未登录。请在终端运行 `claude`，用你的 Claude Pro / Max 账户登录。",
         probeExited: { code, tail in "claude 退出码 \(code)" + (tail.isEmpty ? "" : "：\(tail)") },
         probeNoEvent: "输出里没有 rate_limit_event（API key 用户没有订阅额度）",
+
+        oauthEnable: "用 Claude Code 的登录凭据查询用量（OAuth）",
+        oauthEnableHint: "默认关闭。开启后在后台定时（刚打开过菜单时每 2 分钟，几小时没看则放慢到每 30 分钟）以及点 ↻ 时，AIUsage 从钥匙串读取 Claude Code 的登录令牌（macOS 会先询问，选“始终允许”；AIUsage 更新后可能会再问一次），去请求 Anthropic 的用量接口，也就是 Claude Code /usage 页面用的那个。免费：不消耗 tokens，不会开启 5 小时窗口，桌面端和 claude.ai 上的用量也能看到。该接口没有官方文档，而且 Anthropic 条款规定 Pro / Max 的登录令牌只能用于 Claude Code 和 claude.ai：风险自负。AIUsage 不保存、也不续期这个令牌。",
+        oauthRefreshHint: "请求 OAuth 用量接口。免费，不会开启 5 小时窗口。",
+        oauthNoCredentials: "钥匙串里没有 Claude Code 的登录凭据。请在终端运行 `claude` 并登录。",
+        oauthKeychainNeedsApproval: "AIUsage 需要读取 Claude Code 登录凭据的权限。点 ↻，在弹窗里选“始终允许”。",
+        oauthKeychainDenied: "读取 Claude Code 登录凭据被拒绝。点 ↻ 可再次询问。",
+        oauthKeychainError: { "读取钥匙串失败（错误 \($0)）。" },
+        oauthTokenExpired: "Claude Code 的登录令牌已过期。Claude Code 下次运行时会自动续期；用它一次后再试。",
+        oauthUnauthorized: { "用量接口拒绝了 Claude Code 的登录凭据（HTTP \($0)）。用一次 Claude Code 让它续期后再试。" },
+        oauthRateLimited: "请求用量接口过于频繁，稍后会自动重试。",
+        oauthServerError: { "用量接口返回 HTTP \($0)。" },
+        oauthNetworkError: "无法连接 api.anthropic.com。",
+        oauthNoData: "用量接口没有返回 5 小时或 7 天窗口。",
 
         hookInstalled: "statusline 钩子已安装",
         hookNotInstalled: "未安装 statusline 钩子",
