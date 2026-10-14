@@ -138,7 +138,8 @@ launch, with CodexBar's fallback `2.1.0` when it cannot be read.
 
 401/403 mean the token was rejected; 429 backs off until `Retry-After` (10 min without one).
 
-Cadence (`RefreshPolicy`, after CodexBar's adaptive mode), each wait scaled by a random 0.9–1.1:
+Cadence (`RefreshPolicy`, after CodexBar's adaptive mode, shared with Codex §1.7), each wait scaled by a random
+0.9–1.1:
 
 | Condition | Wait |
 |---|---:|
@@ -230,9 +231,13 @@ The response (other lines, such as notifications, are skipped):
 - An `error` object in the response (e.g. not signed in) is shown verbatim.
 
 It is a usage lookup, not a model request: no tokens, no quota. So there is no passive source and no paid
-"query now" as with Claude; the app polls every 5 minutes while Codex is enabled and again when the menu
-opens if the numbers are over a minute old. The numbers count as stale (⧗) after 20 minutes without a
-successful poll. Each reading is authoritative, so no merge policy or session tracking applies.
+"query now" as with Claude. While Codex is enabled the app polls on §1.3's adaptive cadence with the idle wait
+capped at 15 minutes (2 min after the menu opens, 5 min within the hour, 15 min otherwise, 30 min in Low Power
+Mode or under thermal pressure, each scaled by a random 0.9–1.1). Nothing pushes Codex readings in between, so
+the cap bounds how late an alert can be. A wait that would pass a window's reset is cut to fire 15 seconds after
+it, so the reset is seen and notified on time. Opening the menu polls at once if the numbers are over a minute
+old. The numbers count as stale (⧗) after 40 minutes without a successful poll. Each reading is authoritative,
+so no merge policy or session tracking applies.
 
 Pace windows get ids `codex.five_hour` / `codex.seven_day`, with Claude's tolerances and alert timing.
 Re-pacing works as for Claude (same `CheckpointBook`, stored under separate keys). With no merge to mark

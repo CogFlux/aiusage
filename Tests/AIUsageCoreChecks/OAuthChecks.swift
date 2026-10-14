@@ -84,5 +84,24 @@ enum RefreshPolicyChecks {
         Harness.equal(delay(menuAgo: nil), 1800, "never opened → 30 min")
         Harness.equal(delay(menuAgo: 60, constrained: true), 1800, "Low Power Mode wins over a recent open")
         Harness.equal(delay(menuAgo: -60), 120, "a clock set back counts as recent")
+
+        func capped(menuAgo: TimeInterval?, constrained: Bool = false) -> TimeInterval {
+            RefreshPolicy.delay(now: now, lastMenuOpenAt: menuAgo.map { now.addingTimeInterval(-$0) },
+                                constrained: constrained, idleCap: 15 * 60)
+        }
+        Harness.equal(capped(menuAgo: 60), 120, "a cap leaves the recent steps alone")
+        Harness.equal(capped(menuAgo: 5 * 3600), 900, "idle stops at the cap")
+        Harness.equal(capped(menuAgo: nil), 900, "never opened stops at the cap too")
+        Harness.equal(capped(menuAgo: 60, constrained: true), 1800, "Low Power Mode still backs off past the cap")
+
+        let regular: TimeInterval = 900
+        Harness.equal(RefreshPolicy.wait(regular, wakingForResets: [now.addingTimeInterval(300)], now: now), 315,
+                      "a reset before the next query wakes it just after the reset")
+        Harness.equal(RefreshPolicy.wait(regular, wakingForResets: [now.addingTimeInterval(3600)], now: now), 900,
+                      "a later reset leaves the wait alone")
+        Harness.equal(RefreshPolicy.wait(regular, wakingForResets: [now.addingTimeInterval(-60)], now: now), 900,
+                      "a reset already past is ignored, so a lagging server cannot cause a tight loop")
+        Harness.equal(RefreshPolicy.wait(regular, wakingForResets: [now.addingTimeInterval(600), now.addingTimeInterval(120)], now: now), 135,
+                      "the first reset ahead wins")
     }
 }

@@ -3,8 +3,9 @@ import Combine
 import Foundation
 
 /// Codex (ChatGPT plan) quota. Reading it is free, so unlike Claude there is no passive source to
-/// install and no paid "query now": the store simply polls `codex app-server` while enabled, and
-/// paces the 5-hour and weekly windows with the same math and notifications as Claude's.
+/// install and no paid "query now": the store polls `codex app-server` while enabled, on the same
+/// adaptive cadence as Claude's OAuth query, and paces the 5-hour and weekly windows with the same
+/// math and notifications as Claude's.
 @MainActor
 final class CodexStore: ObservableObject {
     private enum Keys {
@@ -17,11 +18,13 @@ final class CodexStore: ObservableObject {
     }
 
     static let provider = "codex"
-    static let pollInterval: TimeInterval = 5 * 60
+    /// The longest wait between polls while nobody is looking. Shorter than Claude's 30 minutes:
+    /// nothing pushes Codex readings in between, so this also bounds how late an alert can be.
+    static let idleCap: TimeInterval = 15 * 60
     /// Opening the menu refreshes when the numbers are older than this.
     static let refreshOnOpenAfter: TimeInterval = 60
-    /// Polls keep the numbers within minutes; this old means they have been failing.
-    static let staleAfter: TimeInterval = 20 * 60
+    /// Past the slowest wait (30 minutes in Low Power Mode, plus jitter): polls have been failing.
+    static let staleAfter: TimeInterval = 40 * 60
 
     @Published var enabled: Bool {
         didSet {
@@ -67,7 +70,11 @@ final class CodexStore: ObservableObject {
     private let notifier: Notifier
     private let strings: () -> Strings
     private let locale: () -> Locale
+    /// One-shot: re-armed after every poll and whenever the menu opens.
     private var timer: Timer?
+    private var lastPollAt: Date?
+    private var menuOpenedAt: Date?
+    private var jitter = Double.random(in: RefreshPolicy.jitter)
     /// Persisted, so a relaunch does not repeat notifications that already fired.
     private var alertTracker = AlertTracker() {
         didSet {
@@ -138,9 +145,6 @@ final class CodexStore: ObservableObject {
     private func startPolling() {
         stopPolling()
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
     }
 
     private func stopPolling() {
@@ -148,11 +152,33 @@ final class CodexStore: ObservableObject {
         timer = nil
     }
 
+    /// Arms the timer for the next poll: `RefreshPolicy`'s wait counted from the last poll, or just
+    /// after a window's reset if that comes first, so the reset notification is on time.
+    private func scheduleNextPoll() {
+        stopPolling()
+        guard enabled else { return }
+        let info = ProcessInfo.processInfo
+        let constrained = info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
+        let now = Date()
+        let wait = RefreshPolicy.delay(now: now, lastMenuOpenAt: menuOpenedAt, constrained: constrained,
+                                       idleCap: Self.idleCap) * jitter
+        let due = (lastPollAt ?? now).addingTimeInterval(wait).timeIntervalSince(now)
+        let fireIn = RefreshPolicy.wait(due, wakingForResets: usage?.windows.map(\.resetsAt) ?? [], now: now)
+        timer = Timer.scheduledTimer(withTimeInterval: max(fireIn, 1), repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+    }
+
     func refresh() {
         guard !isRefreshing else { return }
         isRefreshing = true
+        lastPollAt = Date()
+        jitter = Double.random(in: RefreshPolicy.jitter)
         Task {
-            defer { isRefreshing = false }
+            defer {
+                isRefreshing = false
+                scheduleNextPoll()
+            }
             guard let path = await lookUpPath() else {
                 let overrideSet = !pathOverride.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 lastError = overrideSet ? strings().codexPathInvalid : strings().codexNotInstalled
@@ -194,13 +220,17 @@ final class CodexStore: ObservableObject {
         return try await CodexProbe.run(codexPath: codexPath)
     }
 
-    /// Called when the menu opens: keep derived values current, and fetch if the numbers are old.
+    /// Called when the menu opens: keep derived values current, fetch if the numbers are old, and
+    /// tighten the cadence to two minutes.
     func tick() {
         now = Date()
+        menuOpenedAt = now
         evaluateAlerts()
         guard enabled else { return }
         if usage.map({ now.timeIntervalSince($0.observedAt) > Self.refreshOnOpenAfter }) ?? true {
             refresh()
+        } else if !isRefreshing {
+            scheduleNextPoll()
         }
     }
 
