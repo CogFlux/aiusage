@@ -67,7 +67,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func windowName(for alert: UsageAlert, strings: Strings) -> String {
-        if let kind = alert.claudeWindow { return strings.windowTitle(kind) }
+        if let kind = alert.claudeWindow { return strings.claudeWindowTitle(kind) }
         if alert.provider == CodexStore.provider, let kind = alert.rateLimitWindow {
             return strings.codexWindowTitle(kind)
         }

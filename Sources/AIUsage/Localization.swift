@@ -249,6 +249,11 @@ struct Strings {
         }
     }
 
+    /// Notifications name the provider; the menu's section header already does.
+    func claudeWindowTitle(_ kind: AIUsageCore.WindowKind) -> String {
+        "Claude " + windowTitle(kind)
+    }
+
     func codexWindowTitle(_ kind: AIUsageCore.WindowKind) -> String {
         "Codex " + windowTitle(kind)
     }
