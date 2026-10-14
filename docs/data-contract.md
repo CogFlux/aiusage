@@ -464,15 +464,15 @@ refused so it cannot leak to another host.
 ```
 
 - **When.** Claude: only after a live reading (probe, or a statusline write whose session's API time grew,
-  §2); idle re-emits are never uploaded as new readings. Codex: after each poll. DeepSeek: after each balance
-  read, only if an account is named for it. Unchanged values are re-sent at most every 15 minutes; uploads are
+  §2); idle re-emits are never uploaded as new readings. Codex: after each poll. The DeepSeek balance is not
+  uploaded: the server queries DeepSeek's API itself. Unchanged values are re-sent at most every 15 minutes; uploads are
   at least 60 s apart unless the user presses *Send now*. A heartbeat (`POST /api/ingest/heartbeat`) every 15
   minutes tells the server the Mac is alive without making readings look fresh.
 - **Times.** `observedAt` per metric is the window's own observation time (a merged snapshot can hold windows
   of different ages, §2); the reading's `observedAt` is the live reading that triggered the upload.
 - **Identity.** `id` is `<account>:<observedAt in ms>`, so a retry of the same observation is a duplicate, not
   a second reading. `windowId` is the window's `resetsAt`; `creditAt` (§3) rides along in `extra`.
-- **Money** is in minor units (fen / cents) with an ISO 4217 `unit`; DeepSeek's `balance` is `total × 100`.
+- **Money** (`UploadPayload.balance`) is in minor units (fen / cents) with an ISO 4217 `unit`: `total × 100`.
 - **Codex plan.** The Codex reading carries one more metric, `{ "key": "subscription", "kind": "date",
   "sense": "limit", "value": null, "unit": "date", "expiresAt": <paid through>, "extra": { "plan": "Plus",
   "activeStart": … } }`, read from the claims `chatgpt_plan_type`, `chatgpt_subscription_active_start` and

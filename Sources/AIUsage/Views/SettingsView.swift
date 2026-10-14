@@ -343,7 +343,6 @@ struct SettingsView: View {
                 Section {
                     TextField("Claude", text: $sync.claudeAccount, prompt: Text("claude"))
                     TextField("Codex", text: $sync.codexAccount, prompt: Text("codex"))
-                    TextField("DeepSeek", text: $sync.deepseekAccount, prompt: Text(s.syncAccountOff))
                 } header: {
                     Text(s.syncAccounts)
                     Text(s.syncAccountsHint)

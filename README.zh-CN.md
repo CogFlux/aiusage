@@ -70,7 +70,7 @@ key 以仅本用户可读的权限保存在 `~/Library/Application Support/AIUsa
 
 ## 同步
 
-设置 → 同步（默认关闭）。把 Claude 和 Codex 的窗口（可选 DeepSeek 余额）上传到 usage-mcp 服务器，在那里和其他余额、
+设置 → 同步（默认关闭）。把 Claude 和 Codex 的窗口上传到 usage-mcp 服务器，在那里和其他余额、
 订阅一起显示，并通过 MCP 提供给 AI 助手。需要填写服务器地址和在服务器上生成的设备令牌。只在数值变化时上传（最多每分钟一次），
 另外每 15 分钟发一次心跳；令牌以仅本人可读的权限保存，只发送给该服务器。详见 [docs/data-contract.md](docs/data-contract.md) §6。
 

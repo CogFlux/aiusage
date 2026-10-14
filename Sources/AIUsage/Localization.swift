@@ -226,7 +226,6 @@ struct Strings {
     let syncTokenRejected: String
     let syncAccounts: String
     let syncAccountsHint: String
-    let syncAccountOff: String
     let syncSendNow: String
     let syncLastSent: (_ ago: String) -> String
     let syncNeverSent: String
@@ -427,7 +426,6 @@ struct Strings {
         syncTokenRejected: "The server rejected the device token (revoked or mistyped). Paste a new one.",
         syncAccounts: "Server accounts",
         syncAccountsHint: "The account slug on the server each provider's numbers go to. Leave one empty to not upload it.",
-        syncAccountOff: "not uploaded",
         syncSendNow: "Send now",
         syncLastSent: { "Last upload \($0)" },
         syncNeverSent: "Nothing uploaded yet",
@@ -608,7 +606,6 @@ struct Strings {
         syncTokenRejected: "服务器拒绝了设备令牌（已吊销或填错）。请粘贴新的令牌。",
         syncAccounts: "服务器账户",
         syncAccountsHint: "每个来源的数据写入服务器上的哪个账户标识。留空则不上传。",
-        syncAccountOff: "不上传",
         syncSendNow: "立即发送",
         syncLastSent: { "上次上传 \($0)" },
         syncNeverSent: "尚未上传",

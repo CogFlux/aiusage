@@ -32,7 +32,7 @@ struct AIUsageApp: App {
         _codex = StateObject(wrappedValue: codex)
         let updater = Updater()
         _updater = StateObject(wrappedValue: updater)
-        let sync = SyncStore(store: store, codex: codex, deepseek: deepseek)
+        let sync = SyncStore(store: store, codex: codex)
         _sync = StateObject(wrappedValue: sync)
         SettingsPresenter.configure(onOpen: { store.refreshNotificationStatus() }) { tab in
             SettingsView(tab: tab)

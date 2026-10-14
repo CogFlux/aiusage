@@ -12,7 +12,8 @@ final class SyncStore: ObservableObject {
         static let endpoint = "syncEndpoint"
         static let claudeAccount = "syncClaudeAccount"
         static let codexAccount = "syncCodexAccount"
-        static let deepseekAccount = "syncDeepseekAccount"
+        /// No longer used: the server queries DeepSeek itself. Cleared on launch.
+        static let retiredDeepseekAccount = "syncDeepseekAccount"
         static let queue = "syncQueue"
         static let lastSent = "syncLastSent"
         static let lastSentAt = "syncLastSentAt"
@@ -36,7 +37,6 @@ final class SyncStore: ObservableObject {
     @Published var endpoint: String { didSet { UserDefaults.standard.set(endpoint, forKey: Keys.endpoint) } }
     @Published var claudeAccount: String { didSet { UserDefaults.standard.set(claudeAccount, forKey: Keys.claudeAccount) } }
     @Published var codexAccount: String { didSet { UserDefaults.standard.set(codexAccount, forKey: Keys.codexAccount) } }
-    @Published var deepseekAccount: String { didSet { UserDefaults.standard.set(deepseekAccount, forKey: Keys.deepseekAccount) } }
 
     @Published private(set) var hasToken: Bool
     @Published var tokenDraft = ""
@@ -69,21 +69,19 @@ final class SyncStore: ObservableObject {
 
     private let store: UsageStore
     private let codex: CodexStore
-    private let deepseek: DeepSeekStore
     private let session = URLSession(configuration: .ephemeral, delegate: RefuseRedirects(), delegateQueue: nil)
 
     static var tokenFileURL: URL { HookInstaller.supportDir.appendingPathComponent("sync.token") }
 
-    init(store: UsageStore, codex: CodexStore, deepseek: DeepSeekStore) {
+    init(store: UsageStore, codex: CodexStore) {
         self.store = store
         self.codex = codex
-        self.deepseek = deepseek
         let defaults = UserDefaults.standard
         enabled = defaults.bool(forKey: Keys.enabled)
         endpoint = defaults.string(forKey: Keys.endpoint) ?? ""
         claudeAccount = defaults.string(forKey: Keys.claudeAccount) ?? "claude"
         codexAccount = defaults.string(forKey: Keys.codexAccount) ?? "codex"
-        deepseekAccount = defaults.string(forKey: Keys.deepseekAccount) ?? ""
+        defaults.removeObject(forKey: Keys.retiredDeepseekAccount)
         hasToken = FileManager.default.fileExists(atPath: Self.tokenFileURL.path)
         lastSentAt = defaults.object(forKey: Keys.lastSentAt) as? Date
         if let data = defaults.data(forKey: Keys.queue),
@@ -119,12 +117,6 @@ final class SyncStore: ObservableObject {
                 Task { @MainActor in self?.codexChanged(usage) }
             }
             .store(in: &subscriptions)
-        deepseek.$latest
-            .compactMap { $0 }
-            .sink { [weak self] balance in
-                Task { @MainActor in self?.deepseekChanged(balance) }
-            }
-            .store(in: &subscriptions)
     }
 
     private func claudeChanged(_ snapshot: UsageSnapshot?) {
@@ -137,12 +129,6 @@ final class SyncStore: ObservableObject {
         guard codex.enabled else { return }
         enqueue(UploadPayload.rateLimits(account: codexAccount, windows: usage.windows, observedAt: usage.observedAt,
                                          plan: usage.planType, subscription: codex.subscription))
-    }
-
-    private func deepseekChanged(_ balance: DeepSeekClient.Balance) {
-        guard deepseek.enabled else { return }
-        enqueue(UploadPayload.balance(account: deepseekAccount, total: balance.total, currency: balance.currency,
-                                      observedAt: Date()))
     }
 
     private func enqueue(_ reading: UploadPayload.Reading?, force: Bool = false) {
