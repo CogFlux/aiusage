@@ -322,47 +322,51 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
-                TextField(s.syncEndpoint, text: $sync.endpoint, prompt: Text(SyncStore.endpointPlaceholder))
-                    .font(.callout.monospaced())
-                if !sync.endpoint.isEmpty, !sync.endpointIsValid {
-                    Text(s.syncInsecureEndpoint).font(.caption).foregroundStyle(.red)
-                }
-                HStack {
-                    SecureField(s.syncToken, text: $sync.tokenDraft, prompt: Text(sync.hasToken ? "••••••••" : "usg_…"))
-                        .onSubmit(sync.saveTypedToken)
-                    Button(s.deepseekSave, action: sync.saveTypedToken).disabled(sync.tokenDraft.isEmpty)
-                }
-                Text(sync.tokenJustSaved ? s.syncTokenSaved : s.syncTokenHint)
-                    .font(.caption).foregroundStyle(sync.tokenJustSaved ? .green : .secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Section {
-                TextField("Claude", text: $sync.claudeAccount, prompt: Text("claude"))
-                TextField("Codex", text: $sync.codexAccount, prompt: Text("codex"))
-                TextField("DeepSeek", text: $sync.deepseekAccount, prompt: Text(s.syncAccountOff))
-            } header: {
-                Text(s.syncAccounts)
-                Text(s.syncAccountsHint)
-            }
-
-            Section {
-                HStack(alignment: .top) {
-                    if let error = sync.lastError {
-                        Text(error).font(.caption).foregroundStyle(.red)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        Text(syncStatus).font(.caption).foregroundStyle(.secondary)
+            // Everything below follows the switch above.
+            Group {
+                Section {
+                    TextField(s.syncEndpoint, text: $sync.endpoint, prompt: Text(SyncStore.endpointPlaceholder))
+                        .font(.callout.monospaced())
+                    if !sync.endpoint.isEmpty, !sync.endpointIsValid {
+                        Text(s.syncInsecureEndpoint).font(.caption).foregroundStyle(.red)
                     }
-                    Spacer()
-                    if sync.isSending {
-                        ProgressView().controlSize(.small)
+                    HStack {
+                        SecureField(s.syncToken, text: $sync.tokenDraft, prompt: Text(sync.hasToken ? "••••••••" : "usg_…"))
+                            .onSubmit(sync.saveTypedToken)
+                        Button(s.deepseekSave, action: sync.saveTypedToken).disabled(sync.tokenDraft.isEmpty)
                     }
-                    Button(s.syncSendNow) { sync.sendNow() }
-                        .disabled(!sync.enabled || !sync.hasToken || !sync.endpointIsValid || sync.isSending)
+                    Text(sync.tokenJustSaved ? s.syncTokenSaved : s.syncTokenHint)
+                        .font(.caption).foregroundStyle(sync.tokenJustSaved ? .green : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Section {
+                    TextField("Claude", text: $sync.claudeAccount, prompt: Text("claude"))
+                    TextField("Codex", text: $sync.codexAccount, prompt: Text("codex"))
+                    TextField("DeepSeek", text: $sync.deepseekAccount, prompt: Text(s.syncAccountOff))
+                } header: {
+                    Text(s.syncAccounts)
+                    Text(s.syncAccountsHint)
+                }
+
+                Section {
+                    HStack(alignment: .top) {
+                        if let error = sync.lastError {
+                            Text(error).font(.caption).foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text(syncStatus).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if sync.isSending {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button(s.syncSendNow) { sync.sendNow() }
+                            .disabled(!sync.hasToken || !sync.endpointIsValid || sync.isSending)
+                    }
                 }
             }
+            .disabled(!sync.enabled)
         }
         .formStyle(.grouped)
     }
