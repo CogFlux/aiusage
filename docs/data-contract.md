@@ -106,8 +106,14 @@ Token: generic password item, service `Claude Code-credentials`, holding
 - Reading another app's item raises the Keychain's Allow/Deny prompt. Only user actions (turning the option on,
   ↻) may show it; background reads pass `LAContext.interactionNotAllowed` plus `kSecUseAuthenticationUIFail` and
   report "needs approval" instead. The app is ad-hoc signed, so "Always Allow" may need repeating after an update.
-- The token is never stored, logged or renewed. Renewal rotates the refresh token and would sign Claude Code out;
-  an expired token (`expiresAt` within 60 s) is reported and left for Claude Code to renew.
+- The token is kept in memory until `expiresAt` (less 60 s), never written to disk, logged or renewed. Renewal
+  rotates the refresh token and would sign Claude Code out; an expired token is reported and left for Claude Code
+  to renew. Caching matters: each read of the item may prompt, and the ad-hoc signed app loses "Always Allow" with
+  every build (CodexBar, Developer-ID signed, also caches the token, in its own Keychain item).
+- The Keychain is read again only when the cached token is missing, rejected (401/403), or expired **and** the
+  item's modification date (an attribute, readable without a prompt) has changed since the last read. So waiting
+  for Claude Code to renew an expired token raises no dialogs. After an account switch (`/login`) the old token
+  stays valid until it expires, so Settings has a "Re-read sign-in" button that drops it and reads the item now.
 
 ```
 GET https://api.anthropic.com/api/oauth/usage

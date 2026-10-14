@@ -72,6 +72,8 @@ struct Strings {
     let precisionNote: String
 
     // Probe
+    let claudeEnable: String
+    let claudeEnableHint: String
     let probeNow: String
     let probeHint: String
     let probeClaudeNotInstalled: String
@@ -85,6 +87,8 @@ struct Strings {
     let oauthEnable: String
     let oauthEnableHint: String
     let oauthRefreshHint: String
+    let oauthReread: String
+    let oauthRereadHint: String
     let oauthNoCredentials: String
     let oauthKeychainNeedsApproval: String
     let oauthKeychainDenied: String
@@ -281,6 +285,8 @@ struct Strings {
         noQuotaInData: "Claude Code is running but reports no subscription quota. Rate limits only exist for Claude Pro and Max accounts; API-key accounts have nothing to show.",
         precisionNote: "Percentages come from Claude's rate-limit headers, which report whole points rounded down. Claude Code's /usage screen may read up to one point higher.",
 
+        claudeEnable: "Track Claude quota",
+        claudeEnableHint: "Reads the 5-hour and 7-day windows of your Claude Pro or Max plan: passively from Claude Code's status line (the hook below), on demand with ↻, and, if you turn it on, through the OAuth query. Over-pace, running-out and reset notifications follow the switches in General.",
         probeNow: "Query now",
         probeHint: "Sends one tiny Haiku request (~500 tokens, ≈ $0.001 API-equivalent). Covered by your Pro or Max subscription; uses a negligible slice of quota. If no window is active, this starts a new 5-hour window.",
         probeClaudeNotInstalled: "Claude Code is not installed, or not on your PATH. Install it, or set its location in Settings → Claude Code.",
@@ -291,8 +297,10 @@ struct Strings {
         probeNoEvent: "No rate_limit_event in output (API-key accounts have no subscription quota)",
 
         oauthEnable: "Query usage with Claude Code's sign-in (OAuth)",
-        oauthEnableHint: "Off by default. In the background (every 2 minutes while you have the menu open, slowing to every 30 when you haven't looked for hours) and when you click ↻, AIUsage reads Claude Code's sign-in token from the Keychain (macOS asks first: choose Always Allow; it may ask again after an AIUsage update) and asks Anthropic's usage endpoint, the one behind Claude Code's /usage screen. Free: no tokens, never starts a 5-hour window, and it also sees usage from the desktop app and claude.ai. The endpoint is undocumented, and Anthropic's terms reserve Pro and Max sign-in tokens for Claude Code and claude.ai: use at your own risk. AIUsage never stores or renews the token.",
+        oauthEnableHint: "Off by default. In the background (every 2 minutes while you have the menu open, slowing to every 30 when you haven't looked for hours) and when you click ↻, AIUsage reads Claude Code's sign-in token from the Keychain (macOS asks first: choose Always Allow; it may ask again after an AIUsage update) and asks Anthropic's usage endpoint, the one behind Claude Code's /usage screen. Free: no tokens, never starts a 5-hour window, and it also sees usage from the desktop app and claude.ai. The endpoint is undocumented, and Anthropic's terms reserve Pro and Max sign-in tokens for Claude Code and claude.ai: use at your own risk. AIUsage keeps the token in memory only, never writes it anywhere, and never renews it.",
         oauthRefreshHint: "Asks the OAuth usage endpoint. Free; never starts a 5-hour window.",
+        oauthReread: "Re-read sign-in",
+        oauthRereadHint: "After switching accounts in Claude Code (/login), read the new sign-in now. Otherwise AIUsage keeps using the old one until it expires. macOS may ask for Keychain access.",
         oauthNoCredentials: "No Claude Code sign-in in the Keychain. Run `claude` in Terminal and sign in.",
         oauthKeychainNeedsApproval: "AIUsage needs permission to read Claude Code's sign-in. Click ↻ and choose Always Allow.",
         oauthKeychainDenied: "Reading Claude Code's sign-in was denied. Click ↻ to be asked again.",
@@ -458,6 +466,8 @@ struct Strings {
         noQuotaInData: "Claude Code 在运行，但没有上报订阅额度。只有 Claude Pro / Max 账户才有速率限制窗口；API key 账户没有可显示的内容。",
         precisionNote: "百分比来自 Claude 的速率限制响应头，只有整数精度且向下取整；Claude Code 的 /usage 可能比这里高 1 个点。",
 
+        claudeEnable: "跟踪 Claude 额度",
+        claudeEnableHint: "读取 Claude Pro / Max 套餐的 5 小时和 7 天窗口：通过 Claude Code 状态栏被动获取（见下方钩子），点 ↻ 时主动查询，开启 OAuth 查询后也会走它。超速、即将用尽和重置通知沿用「通用」里的开关。",
         probeNow: "立即查询",
         probeHint: "发送一次极小的 Haiku 请求（约 500 tokens，≈ $0.001 API 等价）。Pro / Max 套餐内不另收费，只消耗极少量额度；若当前没有活跃窗口，会启动一个新的 5 小时窗口。",
         probeClaudeNotInstalled: "未安装 Claude Code，或它不在 PATH 里。请安装，或在 设置 → Claude Code 指定位置。",
@@ -468,8 +478,10 @@ struct Strings {
         probeNoEvent: "输出里没有 rate_limit_event（API key 用户没有订阅额度）",
 
         oauthEnable: "用 Claude Code 的登录凭据查询用量（OAuth）",
-        oauthEnableHint: "默认关闭。开启后在后台定时（刚打开过菜单时每 2 分钟，几小时没看则放慢到每 30 分钟）以及点 ↻ 时，AIUsage 从钥匙串读取 Claude Code 的登录令牌（macOS 会先询问，选“始终允许”；AIUsage 更新后可能会再问一次），去请求 Anthropic 的用量接口，也就是 Claude Code /usage 页面用的那个。免费：不消耗 tokens，不会开启 5 小时窗口，桌面端和 claude.ai 上的用量也能看到。该接口没有官方文档，而且 Anthropic 条款规定 Pro / Max 的登录令牌只能用于 Claude Code 和 claude.ai：风险自负。AIUsage 不保存、也不续期这个令牌。",
+        oauthEnableHint: "默认关闭。开启后在后台定时（刚打开过菜单时每 2 分钟，几小时没看则放慢到每 30 分钟）以及点 ↻ 时，AIUsage 从钥匙串读取 Claude Code 的登录令牌（macOS 会先询问，选“始终允许”；AIUsage 更新后可能会再问一次），去请求 Anthropic 的用量接口，也就是 Claude Code /usage 页面用的那个。免费：不消耗 tokens，不会开启 5 小时窗口，桌面端和 claude.ai 上的用量也能看到。该接口没有官方文档，而且 Anthropic 条款规定 Pro / Max 的登录令牌只能用于 Claude Code 和 claude.ai：风险自负。AIUsage 只把令牌留在内存里，不写入任何地方，也不续期。",
         oauthRefreshHint: "请求 OAuth 用量接口。免费，不会开启 5 小时窗口。",
+        oauthReread: "重新读取登录凭据",
+        oauthRereadHint: "在 Claude Code 里切换账号（/login）后，点这里立即读取新的登录凭据；否则 AIUsage 会继续用旧的，直到它过期。macOS 可能会询问钥匙串权限。",
         oauthNoCredentials: "钥匙串里没有 Claude Code 的登录凭据。请在终端运行 `claude` 并登录。",
         oauthKeychainNeedsApproval: "AIUsage 需要读取 Claude Code 登录凭据的权限。点 ↻，在弹窗里选“始终允许”。",
         oauthKeychainDenied: "读取 Claude Code 登录凭据被拒绝。点 ↻ 可再次询问。",

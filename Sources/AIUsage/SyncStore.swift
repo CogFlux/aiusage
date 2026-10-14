@@ -128,7 +128,7 @@ final class SyncStore: ObservableObject {
     }
 
     private func claudeChanged(_ snapshot: UsageSnapshot?) {
-        guard let snapshot, let live = store.lastLive, live.at != handledLive else { return }
+        guard store.enabled, let snapshot, let live = store.lastLive, live.at != handledLive else { return }
         handledLive = live.at
         enqueue(UploadPayload.rateLimits(account: claudeAccount, windows: snapshot.windows, observedAt: live.at))
     }
@@ -202,7 +202,7 @@ final class SyncStore: ObservableObject {
     /// Queue the current numbers of every source regardless of whether they changed, then send.
     func sendNow() {
         guard enabled else { return }
-        if let snapshot = store.snapshot {
+        if store.enabled, let snapshot = store.snapshot {
             enqueue(UploadPayload.rateLimits(account: claudeAccount, windows: snapshot.windows,
                                              observedAt: store.confirmed?.at ?? snapshot.observedAt), force: true)
         }

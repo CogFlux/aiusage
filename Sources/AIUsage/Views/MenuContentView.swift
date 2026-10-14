@@ -10,7 +10,7 @@ struct MenuContentView: View {
     private var s: Strings { store.strings }
 
     private var panelProviders: [Provider] {
-        var enabled: Set<Provider> = [.claude]
+        var enabled: Set<Provider> = store.enabled ? [.claude] : []
         if codex.enabled { enabled.insert(.codex) }
         if deepseek.enabled { enabled.insert(.deepseek) }
         return store.layout.panel(enabled: enabled)

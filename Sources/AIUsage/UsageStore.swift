@@ -33,6 +33,7 @@ final class UsageStore: ObservableObject {
         static let alertTracker = "alertTracker"
         static let lastLive = "lastLiveReading"
         static let oauthQuery = "claudeOAuthQuery"
+        static let enabled = "claudeEnabled"
     }
 
     /// Persisted, so a restart does not begin by believing whichever session happened to write the
@@ -90,6 +91,17 @@ final class UsageStore: ObservableObject {
         }
     }
 
+    /// Whether Claude is tracked at all. On by default: unlike Codex and DeepSeek it needs no setup.
+    /// Off hides it from the menu and the menu bar and stops queries, notifications and uploads.
+    @Published var enabled: Bool {
+        didSet {
+            guard enabled != oldValue else { return }
+            UserDefaults.standard.set(enabled, forKey: Keys.enabled)
+            probeState = .idle
+            if enabled { tick() }
+        }
+    }
+
     /// Opt-in: query the OAuth usage endpoint with Claude Code's sign-in instead of `claude -p`,
     /// and do so in the background as well. See `ClaudeOAuthClient`.
     @Published var oauthQueryEnabled: Bool {
@@ -99,7 +111,7 @@ final class UsageStore: ObservableObject {
             oauthBlockedUntil = nil
             probeState = .idle
             // Turning it on is a user action: the right moment for the Keychain prompt.
-            if oauthQueryEnabled { queryOAuth(interactive: true) }
+            if oauthQueryEnabled, enabled { queryOAuth(interactive: true) }
         }
     }
 
@@ -191,6 +203,7 @@ final class UsageStore: ObservableObject {
         language = storedLanguage
         compactMenuBar = defaults.bool(forKey: Keys.compactMenuBar)
         oauthQueryEnabled = defaults.bool(forKey: Keys.oauthQuery)
+        enabled = defaults.object(forKey: Keys.enabled) as? Bool ?? true
         showInClaudeCode = HookInstaller.showsLineInClaudeCode
         notifyOverPace = defaults.bool(forKey: Keys.notifyOverPace)
         notifyRunningOut = defaults.bool(forKey: Keys.notifyRunningOut)
@@ -221,7 +234,7 @@ final class UsageStore: ObservableObject {
         refreshClaudePath()
         reloadFromFile()
         startWatching()
-        if oauthQueryEnabled { queryOAuth(interactive: false) }
+        if enabled, oauthQueryEnabled { queryOAuth(interactive: false) }
 
         ticker = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -280,6 +293,7 @@ final class UsageStore: ObservableObject {
     /// Runs on every new snapshot and every clock tick. The tracker dedupes; here we only filter
     /// by the user's toggles and hand the rest to the notifier.
     private func evaluateAlerts() {
+        guard enabled else { return }
         let before = alertTracker
         let alerts = alertTracker.evaluate(snapshot: snapshot, now: now, paceConfig: config,
                                            checkpoints: checkpoints.active(for: snapshot?.windows ?? []))
@@ -479,13 +493,21 @@ final class UsageStore: ObservableObject {
     /// `interactive` marks a user action: it shows the spinner and may raise the Keychain prompt.
     /// A background run stays silent unless it fails.
     private func queryOAuthIfDue() {
-        guard oauthQueryEnabled, probeState != .running, now >= (oauthBlockedUntil ?? .distantPast) else { return }
+        guard enabled, oauthQueryEnabled, probeState != .running, now >= (oauthBlockedUntil ?? .distantPast) else { return }
         let info = ProcessInfo.processInfo
         let constrained = info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical
         let wait = RefreshPolicy.delay(now: now, lastMenuOpenAt: menuOpenedAt, constrained: constrained) * oauthJitter
         if now.timeIntervalSince(oauthAttemptAt ?? .distantPast) >= wait {
             queryOAuth(interactive: false)
         }
+    }
+
+    /// Settings → "Re-read sign-in": take up a new Claude Code sign-in now, e.g. after switching
+    /// accounts. A user action, so the Keychain prompt may show.
+    func rereadOAuthSignIn() {
+        guard enabled, oauthQueryEnabled, probeState != .running else { return }
+        ClaudeOAuthClient.forgetToken()
+        queryOAuth(interactive: true)
     }
 
     /// The menu just opened: the cadence tightens to two minutes, so an older reading is refreshed now.

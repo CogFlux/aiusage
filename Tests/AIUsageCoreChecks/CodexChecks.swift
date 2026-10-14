@@ -123,6 +123,9 @@ enum CodexChecks {
         Harness.equal(layout.panel(enabled: [.claude]), [], "disabled ones skipped")
         Harness.equal(layout.menuBar(enabled: [.claude, .codex, .deepseek]), [.codex, .deepseek], "menu bar in order")
         Harness.equal(layout.menuBar(enabled: [.claude]), [.claude], "falls back to Claude")
+        Harness.equal(ProviderLayout(order: [.deepseek, .codex, .claude], inMenuBar: [.claude]).menuBar(enabled: [.codex, .deepseek]),
+                      [.deepseek], "with Claude off, falls back to the first enabled provider")
+        Harness.equal(layout.menuBar(enabled: []), [], "nothing enabled, nothing to show")
     }
 
     static func layoutMovesWithinBounds() {

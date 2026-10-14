@@ -47,11 +47,14 @@ public struct ProviderLayout: Codable, Equatable, Sendable {
         order.filter { enabled.contains($0) && !hiddenInPanel.contains($0) }
     }
 
-    /// Menu bar items, left to right. Never empty: an empty menu bar item cannot be clicked, so
-    /// with nothing usable selected it falls back to Claude, which needs no setup to show.
+    /// Menu bar items, left to right. An empty menu bar item cannot be clicked, so with nothing
+    /// usable selected it falls back to Claude, which needs no setup to show, or else to the first
+    /// enabled provider. Empty only when every provider is off; the app then shows its name.
     public func menuBar(enabled: Set<Provider>) -> [Provider] {
         let chosen = order.filter { enabled.contains($0) && inMenuBar.contains($0) }
-        return chosen.isEmpty ? [.claude] : chosen
+        if !chosen.isEmpty { return chosen }
+        if enabled.contains(.claude) { return [.claude] }
+        return order.first(where: enabled.contains).map { [$0] } ?? []
     }
 
     /// Moves `provider` up (negative) or down (positive) in the order, clamped at the ends.

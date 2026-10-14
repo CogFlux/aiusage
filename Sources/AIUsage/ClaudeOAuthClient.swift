@@ -8,8 +8,10 @@ import Security
 /// 5-hour window, and it sees usage from every client (desktop app, claude.ai) rather than only the
 /// sessions that run the statusline hook.
 ///
-/// The token is only read, never stored or renewed: a renewal rotates the refresh token and would
-/// sign Claude Code out. An expired token waits for Claude Code to renew it.
+/// The token is kept in memory until it expires, never written anywhere or renewed: a renewal
+/// rotates the refresh token and would sign Claude Code out. An expired token waits for Claude Code
+/// to renew it. Holding it in memory matters because every read of another app's Keychain item may
+/// raise a password prompt, and an ad-hoc signed app loses "Always Allow" with each build.
 enum ClaudeOAuthClient {
     enum OAuthError: LocalizedError, Equatable {
         case noCredentials
@@ -48,6 +50,7 @@ enum ClaudeOAuthClient {
     /// CodexBar's fallback when the installed Claude Code version cannot be read.
     private static let fallbackClaudeVersion = "2.1.0"
     private static let claudeVersion = VersionCache()
+    private static let tokenCache = TokenCache()
     /// Without a Retry-After header, back off this long after a 429.
     private static let defaultBackoff: TimeInterval = 10 * 60
 
@@ -62,10 +65,33 @@ enum ClaudeOAuthClient {
     /// `interactive` lets the Keychain show its Allow/Deny prompt. Only user actions pass true, so a
     /// background refresh never pops a dialog.
     static func fetch(interactive: Bool, claudePath: String?) async throws -> UsageSnapshot {
-        let (token, version) = try await Task.detached(priority: .userInitiated) {
-            (try readAccessToken(interactive: interactive), claudeVersion.value(claudePath: claudePath))
+        let version = await Task.detached(priority: .userInitiated) { claudeVersion.value(claudePath: claudePath) }.value
+        if let cached = tokenCache.usable() {
+            do {
+                return try await query(token: cached, version: version)
+            } catch OAuthError.unauthorized {
+                // Revoked early, e.g. Claude Code renewed it. Fall through to the Keychain.
+                tokenCache.clear()
+            }
+        }
+        let token = try await Task.detached(priority: .userInitiated) {
+            try readToken(interactive: interactive)
         }.value
+        do {
+            return try await query(token: token, version: version)
+        } catch OAuthError.unauthorized(let status) {
+            tokenCache.clear()
+            throw OAuthError.unauthorized(status)
+        }
+    }
 
+    /// Drops the held token, so the next fetch reads the Keychain again: after a `/login` to another
+    /// account the old token stays valid until it expires and would keep reporting the old account.
+    static func forgetToken() {
+        tokenCache.clear()
+    }
+
+    private static func query(token: String, version: String?) async throws -> UsageSnapshot {
         var request = URLRequest(url: usageURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -96,9 +122,36 @@ enum ClaudeOAuthClient {
         }
     }
 
+    /// The Keychain's token, through the cache. An expired cached token is re-read only once the item
+    /// has changed: its modification date is an attribute, readable without any prompt, so waiting
+    /// for Claude Code to renew the token costs no dialogs.
+    private static func readToken(interactive: Bool) throws -> String {
+        let modified = itemModificationDate()
+        if tokenCache.isExpired, modified != nil, modified == tokenCache.itemModifiedAt {
+            throw OAuthError.tokenExpired
+        }
+        let (token, expiresAt) = try readAccessToken(interactive: interactive)
+        tokenCache.store(token, expiresAt: expiresAt, itemModifiedAt: modified)
+        guard tokenCache.usable() != nil else { throw OAuthError.tokenExpired }
+        return token
+    }
+
+    private static func itemModificationDate() -> Date? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnAttributes as String: true,
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let attributes = result as? [String: Any] else { return nil }
+        return attributes[kSecAttrModificationDate as String] as? Date
+    }
+
     /// Claude Code keeps `{"claudeAiOauth":{"accessToken":…,"expiresAt":<ms>,…}}` in a generic
     /// password item. Only the access token and its expiry are looked at.
-    private static func readAccessToken(interactive: Bool) throws -> String {
+    private static func readAccessToken(interactive: Bool) throws -> (String, Date?) {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
@@ -134,10 +187,52 @@ enum ClaudeOAuthClient {
               !token.isEmpty else {
             throw OAuthError.noCredentials
         }
-        if let ms = (oauth["expiresAt"] as? NSNumber)?.doubleValue,
-           Date(timeIntervalSince1970: ms / 1000) <= Date().addingTimeInterval(60) {
-            throw OAuthError.tokenExpired
+        let expiresAt = (oauth["expiresAt"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue / 1000) }
+        return (token, expiresAt)
+    }
+}
+
+/// The access token, in memory only, with what is needed to know when to read it again.
+private final class TokenCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var token: String?
+    private var expiresAt: Date?
+    private var modifiedAt: Date?
+
+    /// Treated as expired this long before `expiresAt`, so a request never goes out with a dying token.
+    private static let margin: TimeInterval = 60
+
+    func usable() -> String? {
+        lock.withLock { usableUnlocked() }
+    }
+
+    /// A token is held but past its expiry.
+    var isExpired: Bool {
+        lock.withLock { token != nil && usableUnlocked() == nil }
+    }
+
+    var itemModifiedAt: Date? { lock.withLock { modifiedAt } }
+
+    func store(_ token: String, expiresAt: Date?, itemModifiedAt: Date?) {
+        lock.withLock {
+            self.token = token
+            self.expiresAt = expiresAt
+            modifiedAt = itemModifiedAt
         }
+    }
+
+    /// After a rejection: the next fetch reads the Keychain again whatever the item's date.
+    func clear() {
+        lock.withLock {
+            token = nil
+            expiresAt = nil
+            modifiedAt = nil
+        }
+    }
+
+    private func usableUnlocked() -> String? {
+        guard let token else { return nil }
+        if let expiresAt, expiresAt <= Date().addingTimeInterval(Self.margin) { return nil }
         return token
     }
 }

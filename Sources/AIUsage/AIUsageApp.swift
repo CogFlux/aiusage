@@ -59,7 +59,7 @@ struct AIUsageApp: App {
     }
 
     private var enabledProviders: Set<Provider> {
-        var set: Set<Provider> = [.claude]
+        var set: Set<Provider> = store.enabled ? [.claude] : []
         if codex.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
         return set
@@ -136,7 +136,8 @@ struct AIUsageApp: App {
                 .environmentObject(codex)
                 .environmentObject(updater)
         } label: {
-            Text(menuBarTitle)
+            // With every provider off there is nothing to show, but the item must stay clickable.
+            Text(menuBarTitle.isEmpty ? "AIUsage" : menuBarTitle)
                 .monospacedDigit()
         }
         .menuBarExtraStyle(.window)

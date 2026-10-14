@@ -135,7 +135,7 @@ struct SettingsView: View {
     // MARK: Layout
 
     private var enabledProviders: Set<Provider> {
-        var set: Set<Provider> = [.claude]
+        var set: Set<Provider> = store.enabled ? [.claude] : []
         if codex.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
         return set
@@ -202,10 +202,10 @@ struct SettingsView: View {
         }
     }
 
-    /// Where a provider is switched on; Claude has no switch.
+    /// Where a provider is switched on.
     private func settingsTab(_ provider: Provider) -> Tab? {
         switch provider {
-        case .claude: return nil
+        case .claude: return .claudeCode
         case .codex: return .codex
         case .deepseek: return .deepseek
         }
@@ -222,25 +222,29 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
-                TextField(s.codexPath, text: $codex.pathOverride,
-                          prompt: Text(codex.resolvedPath ?? s.codexPathPlaceholder))
-                    .font(.callout.monospaced())
-                HStack(alignment: .top) {
-                    if let error = codex.lastError {
-                        Text(error).font(.caption).foregroundStyle(codex.errorIsMinor ? Color.secondary : .red)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else if let summary = codexSummary {
-                        Text(summary).font(.caption).foregroundStyle(.secondary)
+            // Everything below follows the switch above.
+            Group {
+                Section {
+                    TextField(s.codexPath, text: $codex.pathOverride,
+                              prompt: Text(codex.resolvedPath ?? s.codexPathPlaceholder))
+                        .font(.callout.monospaced())
+                    HStack(alignment: .top) {
+                        if let error = codex.lastError {
+                            Text(error).font(.caption).foregroundStyle(codex.errorIsMinor ? Color.secondary : .red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if let summary = codexSummary {
+                            Text(summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if codex.isRefreshing {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button(s.codexRefresh) { codex.refresh() }
+                            .disabled(codex.isRefreshing)
                     }
-                    Spacer()
-                    if codex.isRefreshing {
-                        ProgressView().controlSize(.small)
-                    }
-                    Button(s.codexRefresh) { codex.refresh() }
-                        .disabled(!codex.enabled || codex.isRefreshing)
                 }
             }
+            .disabled(!codex.enabled)
         }
         .formStyle(.grouped)
     }
@@ -264,41 +268,45 @@ struct SettingsView: View {
                 }
             }
 
-            Section {
-                HStack {
-                    SecureField(s.deepseekAPIKey, text: $deepseek.apiKeyDraft,
-                                prompt: Text(deepseek.hasAPIKey ? "••••••••" : "sk-…"))
-                        .onSubmit(deepseek.saveTypedAPIKey)
-                    Button(s.deepseekSave, action: deepseek.saveTypedAPIKey).disabled(deepseek.apiKeyDraft.isEmpty)
+            // Everything below follows the switch above.
+            Group {
+                Section {
+                    HStack {
+                        SecureField(s.deepseekAPIKey, text: $deepseek.apiKeyDraft,
+                                    prompt: Text(deepseek.hasAPIKey ? "••••••••" : "sk-…"))
+                            .onSubmit(deepseek.saveTypedAPIKey)
+                        Button(s.deepseekSave, action: deepseek.saveTypedAPIKey).disabled(deepseek.apiKeyDraft.isEmpty)
+                    }
+                    HStack {
+                        Text(deepseek.apiKeyJustSaved ? s.deepseekAPIKeySaved : s.deepseekAPIKeyHint)
+                            .font(.caption).foregroundStyle(deepseek.apiKeyJustSaved ? .green : .secondary)
+                        Spacer()
+                        Button(s.deepseekRefresh) { deepseek.refresh() }
+                            .disabled(!deepseek.hasAPIKey || deepseek.isRefreshing)
+                    }
+                    if let error = deepseek.lastError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    } else if let latest = deepseek.latest {
+                        Text("\(s.deepseekBalance): \(deepseek.money(latest.total))").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
-                HStack {
-                    Text(deepseek.apiKeyJustSaved ? s.deepseekAPIKeySaved : s.deepseekAPIKeyHint)
-                        .font(.caption).foregroundStyle(deepseek.apiKeyJustSaved ? .green : .secondary)
-                    Spacer()
-                    Button(s.deepseekRefresh) { deepseek.refresh() }
-                        .disabled(!deepseek.hasAPIKey || deepseek.isRefreshing)
-                }
-                if let error = deepseek.lastError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                } else if let latest = deepseek.latest {
-                    Text("\(s.deepseekBalance): \(deepseek.money(latest.total))").font(.caption).foregroundStyle(.secondary)
-                }
-            }
 
-            Section {
-                Toggle(isOn: $deepseek.budgetEnabled) {
-                    Text(s.deepseekMonthlyBudget)
-                    Text(s.deepseekMonthlyBudgetHint)
+                Section {
+                    Toggle(isOn: $deepseek.budgetEnabled) {
+                        Text(s.deepseekMonthlyBudget)
+                        Text(s.deepseekMonthlyBudgetHint)
+                    }
+                    if deepseek.budgetEnabled {
+                        TextField(s.deepseekMonthlyBudgetAmount, value: $deepseek.monthlyBudget, format: .number)
+                    }
                 }
-                if deepseek.budgetEnabled {
-                    TextField(s.deepseekMonthlyBudgetAmount, value: $deepseek.monthlyBudget, format: .number)
-                }
-            }
 
-            Section {
-                TextField(s.deepseekLowBalance, value: $deepseek.lowBalanceThreshold, format: .number)
-                Toggle(s.deepseekNotifyLowBalance, isOn: $deepseek.notifyLowBalance)
+                Section {
+                    TextField(s.deepseekLowBalance, value: $deepseek.lowBalanceThreshold, format: .number)
+                    Toggle(s.deepseekNotifyLowBalance, isOn: $deepseek.notifyLowBalance)
+                }
             }
+            .disabled(!deepseek.enabled)
         }
         .formStyle(.grouped)
     }
@@ -377,47 +385,68 @@ struct SettingsView: View {
     private var claudeCodeTab: some View {
         Form {
             Section {
-                HStack {
-                    Image(systemName: store.hookInstalled ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(store.hookInstalled ? Color.green : Color.secondary)
-                    Text(store.hookInstalled ? s.hookInstalled : s.hookNotInstalled)
-                    Spacer()
-                    Button(store.hookInstalled ? s.reinstall : s.install) {
-                        store.installHook()
+                Toggle(isOn: $store.enabled) {
+                    Text(s.claudeEnable)
+                    Text(s.claudeEnableHint)
+                }
+            }
+
+            // Everything below follows the switch above.
+            Group {
+                Section {
+                    HStack {
+                        Image(systemName: store.hookInstalled ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(store.hookInstalled ? Color.green : Color.secondary)
+                        Text(store.hookInstalled ? s.hookInstalled : s.hookNotInstalled)
+                        Spacer()
+                        Button(store.hookInstalled ? s.reinstall : s.install) {
+                            store.installHook()
+                        }
+                    }
+                    Text(s.hookHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let error = store.hookError {
+                        Text(error).font(.caption).foregroundStyle(.red)
                     }
                 }
-                Text(s.hookHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let error = store.hookError {
-                    Text(error).font(.caption).foregroundStyle(.red)
+
+                Section {
+                    Toggle(isOn: $store.showInClaudeCode) {
+                        Text(s.showInClaudeCode)
+                        Text(s.showInClaudeCodeHint)
+                    }
+                    .disabled(!store.hookInstalled)
+                }
+
+                Section {
+                    Toggle(isOn: $store.oauthQueryEnabled) {
+                        Text(s.oauthEnable)
+                        Text(s.oauthEnableHint)
+                    }
+                    HStack(alignment: .top) {
+                        Text(s.oauthRereadHint).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        if store.probeState == .running {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button(s.oauthReread) { store.rereadOAuthSignIn() }
+                            .disabled(!store.oauthQueryEnabled || store.probeState == .running)
+                    }
+                }
+
+                Section {
+                    TextField(s.claudePath, text: $store.claudePathOverride,
+                              prompt: Text(store.resolvedClaudePath ?? s.claudePathPlaceholder))
+                        .font(.callout.monospaced())
+                }
+
+                Section {
+                    Text(s.precisionNote).font(.caption).foregroundStyle(.secondary)
                 }
             }
-
-            Section {
-                Toggle(isOn: $store.showInClaudeCode) {
-                    Text(s.showInClaudeCode)
-                    Text(s.showInClaudeCodeHint)
-                }
-                .disabled(!store.hookInstalled)
-            }
-
-            Section {
-                Toggle(isOn: $store.oauthQueryEnabled) {
-                    Text(s.oauthEnable)
-                    Text(s.oauthEnableHint)
-                }
-            }
-
-            Section {
-                TextField(s.claudePath, text: $store.claudePathOverride,
-                          prompt: Text(store.resolvedClaudePath ?? s.claudePathPlaceholder))
-                    .font(.callout.monospaced())
-            }
-
-            Section {
-                Text(s.precisionNote).font(.caption).foregroundStyle(.secondary)
-            }
+            .disabled(!store.enabled)
         }
         .formStyle(.grouped)
     }
