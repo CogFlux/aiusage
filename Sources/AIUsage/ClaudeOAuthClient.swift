@@ -8,10 +8,12 @@ import Security
 /// 5-hour window, and it sees usage from every client (desktop app, claude.ai) rather than only the
 /// sessions that run the statusline hook.
 ///
-/// The token is kept in memory until it expires, never written anywhere or renewed: a renewal
-/// rotates the refresh token and would sign Claude Code out. An expired token waits for Claude Code
-/// to renew it. Holding it in memory matters because every read of another app's Keychain item may
-/// raise a password prompt, and an ad-hoc signed app loses "Always Allow" with each build.
+/// The token is kept in memory until it expires, never written anywhere or renewed here: a renewal
+/// rotates the refresh token, and one Claude Code did not make would sign it out. An expired token is
+/// renewed by Claude Code itself, which `claude auth status` makes it do (as CodexBar runs `/status`),
+/// after which the item is read again. Holding the token in memory matters because every read of
+/// another app's Keychain item may raise a password prompt, and an ad-hoc signed app loses
+/// "Always Allow" with each build.
 enum ClaudeOAuthClient {
     enum OAuthError: LocalizedError, Equatable {
         case noCredentials
@@ -51,6 +53,8 @@ enum ClaudeOAuthClient {
     private static let fallbackClaudeVersion = "2.1.0"
     private static let claudeVersion = VersionCache()
     private static let tokenCache = TokenCache()
+    private static let renewalGate = RenewalGate()
+    private static let renewalTimeout: TimeInterval = 20
     /// Without a Retry-After header, back off this long after a 429.
     private static let defaultBackoff: TimeInterval = 10 * 60
 
@@ -74,9 +78,16 @@ enum ClaudeOAuthClient {
                 tokenCache.clear()
             }
         }
-        let token = try await Task.detached(priority: .userInitiated) {
-            try readToken(interactive: interactive)
-        }.value
+        let token: String
+        do {
+            token = try await readTokenDetached(interactive: interactive)
+        } catch OAuthError.tokenExpired {
+            // A background attempt waits out the cooldown; a user action always tries.
+            guard let claudePath, renewalGate.reserve(now: Date(), force: interactive) else { throw OAuthError.tokenExpired }
+            await Task.detached(priority: .userInitiated) { renewThroughClaudeCode(claudePath: claudePath) }.value
+            // Still expired if the item did not change, i.e. Claude Code could not renew it either.
+            token = try await readTokenDetached(interactive: interactive)
+        }
         do {
             return try await query(token: token, version: version)
         } catch OAuthError.unauthorized(let status) {
@@ -119,6 +130,35 @@ enum ClaudeOAuthClient {
             throw OAuthError.rateLimited(until: Date().addingTimeInterval(max(seconds, 60)))
         default:
             throw OAuthError.server(http.statusCode)
+        }
+    }
+
+    private static func readTokenDetached(interactive: Bool) async throws -> String {
+        try await Task.detached(priority: .userInitiated) {
+            try readToken(interactive: interactive)
+        }.value
+    }
+
+    /// Runs `claude auth status`, which renews an expired token as any Claude Code start does, without
+    /// a model request. The output is not read: success shows as a changed Keychain item. Blocks up
+    /// to `renewalTimeout`; run it off the main thread.
+    private static func renewThroughClaudeCode(claudePath: String) {
+        let cwd = FileManager.default.temporaryDirectory.appendingPathComponent("aiusage-probe", isDirectory: true)
+        try? FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: claudePath)
+        process.arguments = ["auth", "status", "--json"]
+        process.currentDirectoryURL = cwd
+        // No `--setting-sources`, so settings.json and its proxy settings apply as in a normal run.
+        process.environment = ClaudeProbe.standaloneEnvironment(cwd: cwd)
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        guard (try? process.run()) != nil else { return }
+        if exited.wait(timeout: .now() + renewalTimeout) == .timedOut {
+            process.terminate()
         }
     }
 
@@ -234,6 +274,24 @@ private final class TokenCache: @unchecked Sendable {
         guard let token else { return nil }
         if let expiresAt, expiresAt <= Date().addingTimeInterval(Self.margin) { return nil }
         return token
+    }
+}
+
+/// Spaces out background renewals, so a Claude Code that cannot renew (signed out, offline) is not
+/// started on every poll. CodexBar waits the same five minutes.
+private final class RenewalGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastAttemptAt: Date?
+
+    private static let cooldown: TimeInterval = 5 * 60
+
+    /// True when an attempt may start now, which is then recorded. `force` skips the cooldown.
+    func reserve(now: Date, force: Bool) -> Bool {
+        lock.withLock {
+            if !force, let lastAttemptAt, now.timeIntervalSince(lastAttemptAt) < Self.cooldown { return false }
+            lastAttemptAt = now
+            return true
+        }
     }
 }
 

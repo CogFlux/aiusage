@@ -57,6 +57,26 @@ enum ClaudeProbe {
         }.value
     }
 
+    /// The app's environment, made to look like a fresh, standalone `claude` run from `cwd`.
+    static func standaloneEnvironment(cwd: URL) -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        // Session-scoped variables leak in when the app itself was launched from a terminal
+        // running inside Claude Code.
+        for key in ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PID",
+                    "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED",
+                    "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN"] {
+            env.removeValue(forKey: key)
+        }
+        // `Process` changes the working directory but leaves the inherited `PWD` untouched, and
+        // Claude Code trusts `PWD`. If the app was launched from a shell sitting in ~/Documents
+        // (or Desktop, Downloads), claude would touch that folder and macOS would prompt for
+        // folder access. Point it at the scratch directory instead.
+        env["PWD"] = cwd.path
+        env.removeValue(forKey: "OLDPWD")
+        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + (env["PATH"] ?? "/usr/bin:/bin")
+        return env
+    }
+
     private static func runBlocking(claudePath: String, extraEnv: [String: String], timeout: TimeInterval) throws -> UsageSnapshot {
         // An empty cwd so no project CLAUDE.md or .mcp.json gets picked up.
         let cwd = FileManager.default.temporaryDirectory.appendingPathComponent("aiusage-probe", isDirectory: true)
@@ -67,24 +87,10 @@ enum ClaudeProbe {
         process.currentDirectoryURL = cwd
         process.arguments = arguments
 
-        var env = ProcessInfo.processInfo.environment
-        // Session-scoped variables leak in when the app itself was launched from a terminal
-        // running inside Claude Code; the probe must look like a fresh, standalone invocation.
-        for key in ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PID",
-                    "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED",
-                    "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN"] {
-            env.removeValue(forKey: key)
-        }
-        // `Process` changes the working directory but leaves the inherited `PWD` untouched, and
-        // Claude Code trusts `PWD`. If the app was launched from a shell sitting in ~/Documents
-        // (or Desktop, Downloads), the probe would touch that folder and macOS would prompt for
-        // folder access. Point it at the scratch directory instead.
-        env["PWD"] = cwd.path
-        env.removeValue(forKey: "OLDPWD")
+        var env = standaloneEnvironment(cwd: cwd)
         // `--setting-sources ""` drops settings.json, including its `env` block (proxies etc.),
         // so re-apply that block explicitly.
         for (k, v) in extraEnv { env[k] = v }
-        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + (env["PATH"] ?? "/usr/bin:/bin")
         process.environment = env
 
         let out = Pipe()

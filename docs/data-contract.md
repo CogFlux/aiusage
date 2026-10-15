@@ -106,10 +106,16 @@ Token: generic password item, service `Claude Code-credentials`, holding
 - Reading another app's item raises the Keychain's Allow/Deny prompt. Only user actions (turning the option on,
   ↻) may show it; background reads pass `LAContext.interactionNotAllowed` plus `kSecUseAuthenticationUIFail` and
   report "needs approval" instead. The app is ad-hoc signed, so "Always Allow" may need repeating after an update.
-- The token is kept in memory until `expiresAt` (less 60 s), never written to disk, logged or renewed. Renewal
-  rotates the refresh token and would sign Claude Code out; an expired token is reported and left for Claude Code
-  to renew. Caching matters: each read of the item may prompt, and the ad-hoc signed app loses "Always Allow" with
-  every build (CodexBar, Developer-ID signed, also caches the token, in its own Keychain item).
+- The token is kept in memory until `expiresAt` (less 60 s), never written to disk or logged, and never renewed
+  by the app: renewal rotates the refresh token, and a rotation Claude Code did not make would sign it out.
+  Caching matters: each read of the item may prompt, and the ad-hoc signed app loses "Always Allow" with every
+  build (CodexBar, Developer-ID signed, also caches the token, in its own Keychain item).
+- An expired token is renewed by Claude Code itself. Claude Code renews it whenever it starts, so the app runs
+  `claude auth status --json` (no model request, output discarded; standalone environment and scratch cwd as for
+  the probe, settings.json applies), waits up to 20 s, then reads the item again. CodexBar does the same with
+  `claude /status` in a pseudo-terminal. Background attempts are at least 5 minutes apart; ↻ always tries. If the
+  item did not change, "expired" is reported with a pointer to run `claude` and sign in again. Users who only use
+  the desktop app need this: its Code tab keeps its own sign-in and never renews the CLI's item.
 - The Keychain is read again only when the cached token is missing, rejected (401/403), or expired **and** the
   item's modification date (an attribute, readable without a prompt) has changed since the last read. So waiting
   for Claude Code to renew an expired token raises no dialogs. After an account switch (`/login`) the old token
