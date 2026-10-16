@@ -10,10 +10,9 @@ import Security
 ///
 /// The token is kept in memory until it expires, never written anywhere or renewed here: a renewal
 /// rotates the refresh token, and one Claude Code did not make would sign it out. An expired token is
-/// renewed by Claude Code itself, which `claude auth status` makes it do (as CodexBar runs `/status`),
-/// after which the item is read again. Holding the token in memory matters because every read of
-/// another app's Keychain item may raise a password prompt, and an ad-hoc signed app loses
-/// "Always Allow" with each build.
+/// renewed by Claude Code itself, which a brief interactive start makes it do (see
+/// `ClaudeSignInRenewal`), after which the item is read again. The item is read with
+/// `/usr/bin/security`, as Claude Code reads it, so no Keychain prompt shows.
 enum ClaudeOAuthClient {
     enum OAuthError: LocalizedError, Equatable {
         case noCredentials
@@ -54,7 +53,8 @@ enum ClaudeOAuthClient {
     private static let claudeVersion = VersionCache()
     private static let tokenCache = TokenCache()
     private static let renewalGate = RenewalGate()
-    private static let renewalTimeout: TimeInterval = 20
+    /// Generous: stopping Claude Code between rotating the refresh token and saving it would sign it out.
+    private static let renewalTimeout: TimeInterval = 30
     /// Without a Retry-After header, back off this long after a 429.
     private static let defaultBackoff: TimeInterval = 10 * 60
 
@@ -85,6 +85,7 @@ enum ClaudeOAuthClient {
             // A background attempt waits out the cooldown; a user action always tries.
             guard let claudePath, renewalGate.reserve(now: Date(), force: interactive) else { throw OAuthError.tokenExpired }
             await Task.detached(priority: .userInitiated) { renewThroughClaudeCode(claudePath: claudePath) }.value
+            renewalGate.finish()
             // Still expired if the item did not change, i.e. Claude Code could not renew it either.
             token = try await readTokenDetached(interactive: interactive)
         }
@@ -139,26 +140,13 @@ enum ClaudeOAuthClient {
         }.value
     }
 
-    /// Runs `claude auth status`, which renews an expired token as any Claude Code start does, without
-    /// a model request. The output is not read: success shows as a changed Keychain item. Blocks up
-    /// to `renewalTimeout`; run it off the main thread.
+    /// Starts Claude Code until the item changes, i.e. until it has renewed the token. Blocks up to
+    /// `renewalTimeout`; run it off the main thread.
     private static func renewThroughClaudeCode(claudePath: String) {
-        let cwd = FileManager.default.temporaryDirectory.appendingPathComponent("aiusage-probe", isDirectory: true)
-        try? FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: claudePath)
-        process.arguments = ["auth", "status", "--json"]
-        process.currentDirectoryURL = cwd
-        // No `--setting-sources`, so settings.json and its proxy settings apply as in a normal run.
-        process.environment = ClaudeProbe.standaloneEnvironment(cwd: cwd)
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        let exited = DispatchSemaphore(value: 0)
-        process.terminationHandler = { _ in exited.signal() }
-        guard (try? process.run()) != nil else { return }
-        if exited.wait(timeout: .now() + renewalTimeout) == .timedOut {
-            process.terminate()
+        let before = itemModificationDate()
+        ClaudeSignInRenewal.run(claudePath: claudePath, extraEnv: HookInstaller.settingsEnv(),
+                                timeout: renewalTimeout) {
+            before != nil && itemModificationDate() != before
         }
     }
 
@@ -192,6 +180,48 @@ enum ClaudeOAuthClient {
     /// Claude Code keeps `{"claudeAiOauth":{"accessToken":…,"expiresAt":<ms>,…}}` in a generic
     /// password item. Only the access token and its expiry are looked at.
     private static func readAccessToken(interactive: Bool) throws -> (String, Date?) {
+        // A prompt from `security` (for an item it did not create) gets time to be answered only when
+        // the user asked for the read.
+        switch readWithSecurityTool(timeout: interactive ? 60 : 3) {
+        case let .found(data): return try parseCredentials(data)
+        case .notFound: throw OAuthError.noCredentials
+        case .failed: return try parseCredentials(readWithSecurityFramework(interactive: interactive))
+        }
+    }
+
+    private enum SecurityToolResult {
+        case found(Data)
+        case notFound
+        case failed
+    }
+
+    /// Reads the item with `/usr/bin/security`, as Claude Code itself does. Claude Code writes the item
+    /// with that tool, so the item's access list trusts it and no prompt shows. Reading it directly would
+    /// prompt again each time Claude Code rewrites the item on renewal, which drops "Always Allow".
+    private static func readWithSecurityTool(timeout: TimeInterval) -> SecurityToolResult {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = ["find-generic-password", "-s", keychainService, "-w"]
+        let out = Pipe()
+        process.standardOutput = out
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        guard (try? process.run()) != nil else { return .failed }
+        if exited.wait(timeout: .now() + timeout) == .timedOut {
+            process.terminate()
+            return .failed
+        }
+        // errSecItemNotFound, as an exit status.
+        if process.terminationStatus == 44 { return .notFound }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        guard process.terminationStatus == 0, !data.isEmpty else { return .failed }
+        return .found(data)
+    }
+
+    /// The fallback when `security` cannot read the item. Background reads never show the prompt.
+    private static func readWithSecurityFramework(interactive: Bool) throws -> Data {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
@@ -220,8 +250,12 @@ enum ClaudeOAuthClient {
         default:
             throw OAuthError.keychain(status)
         }
-        guard let data = result as? Data,
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let data = result as? Data else { throw OAuthError.noCredentials }
+        return data
+    }
+
+    private static func parseCredentials(_ data: Data) throws -> (String, Date?) {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let oauth = root["claudeAiOauth"] as? [String: Any],
               let token = (oauth["accessToken"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !token.isEmpty else {
@@ -278,20 +312,28 @@ private final class TokenCache: @unchecked Sendable {
 }
 
 /// Spaces out background renewals, so a Claude Code that cannot renew (signed out, offline) is not
-/// started on every poll. CodexBar waits the same five minutes.
+/// started on every poll, and keeps two from running at once. CodexBar waits the same five minutes.
 private final class RenewalGate: @unchecked Sendable {
     private let lock = NSLock()
     private var lastAttemptAt: Date?
+    private var running = false
 
     private static let cooldown: TimeInterval = 5 * 60
 
-    /// True when an attempt may start now, which is then recorded. `force` skips the cooldown.
+    /// True when an attempt may start now, which is then recorded; call `finish()` after it. `force`
+    /// skips the cooldown.
     func reserve(now: Date, force: Bool) -> Bool {
         lock.withLock {
+            if running { return false }
             if !force, let lastAttemptAt, now.timeIntervalSince(lastAttemptAt) < Self.cooldown { return false }
             lastAttemptAt = now
+            running = true
             return true
         }
+    }
+
+    func finish() {
+        lock.withLock { running = false }
     }
 }
 

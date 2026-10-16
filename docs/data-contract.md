@@ -103,19 +103,25 @@ Code and claude.ai (see §1.5). The Settings toggle says so; turning it on is th
 Token: generic password item, service `Claude Code-credentials`, holding
 `{"claudeAiOauth":{"accessToken":"…","expiresAt":<unix ms>,…}}`. Only `accessToken` and `expiresAt` are read.
 
-- Reading another app's item raises the Keychain's Allow/Deny prompt. Only user actions (turning the option on,
-  ↻) may show it; background reads pass `LAContext.interactionNotAllowed` plus `kSecUseAuthenticationUIFail` and
-  report "needs approval" instead. The app is ad-hoc signed, so "Always Allow" may need repeating after an update.
+- The item is read with `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w`, as Claude Code
+  reads it. Claude Code writes the item with that tool, so the item's access list trusts it and no prompt shows.
+  Reading through Security.framework instead raises the Allow/Deny prompt, and again after every renewal, since
+  Claude Code rewrites the item and drops "Always Allow". If `security` fails (or, in the background, takes over
+  3 s, i.e. is waiting on a prompt), the app falls back to Security.framework: only user actions (turning the
+  option on, ↻) may show its prompt; background reads pass `LAContext.interactionNotAllowed` plus
+  `kSecUseAuthenticationUIFail` and report "needs approval" instead.
 - The token is kept in memory until `expiresAt` (less 60 s), never written to disk or logged, and never renewed
   by the app: renewal rotates the refresh token, and a rotation Claude Code did not make would sign it out.
-  Caching matters: each read of the item may prompt, and the ad-hoc signed app loses "Always Allow" with every
-  build (CodexBar, Developer-ID signed, also caches the token, in its own Keychain item).
-- An expired token is renewed by Claude Code itself. Claude Code renews it whenever it starts, so the app runs
-  `claude auth status --json` (no model request, output discarded; standalone environment and scratch cwd as for
-  the probe, settings.json applies), waits up to 20 s, then reads the item again. CodexBar does the same with
-  `claude /status` in a pseudo-terminal. Background attempts are at least 5 minutes apart; ↻ always tries. If the
-  item did not change, "expired" is reported with a pointer to run `claude` and sign in again. Users who only use
-  the desktop app need this: its Code tab keeps its own sign-in and never renews the CLI's item.
+- An expired token is renewed by Claude Code itself, which does so when an interactive session starts. Subcommands
+  such as `claude auth status` only read local state and do not renew. So the app starts `claude` in a
+  pseudo-terminal (as the probe: scratch cwd, standalone environment, `--setting-sources ""` with settings.json's
+  `env` re-applied, no MCP servers), types nothing, so no model request is made, and stops it (SIGTERM, then
+  SIGKILL after 3 s) once the item's modification date changes, or after 30 s. The first start in the scratch
+  folder shows Claude Code's folder-trust question; the app accepts it with Return. It answers the terminal's
+  cursor-position query. CodexBar does the same with `claude /status`. Background attempts are at least
+  5 minutes apart and never overlap; ↻ always tries. If the item did not change, "expired" is reported with a
+  pointer to run `claude` and sign in again. Users who only use the desktop app need this: its Code tab keeps
+  its own sign-in and never renews the CLI's item.
 - The Keychain is read again only when the cached token is missing, rejected (401/403), or expired **and** the
   item's modification date (an attribute, readable without a prompt) has changed since the last read. So waiting
   for Claude Code to renew an expired token raises no dialogs. After an account switch (`/login`) the old token

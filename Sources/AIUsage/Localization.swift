@@ -301,7 +301,7 @@ struct Strings {
         probeNoEvent: "No rate_limit_event in output (API-key accounts have no subscription quota)",
 
         oauthEnable: "Query usage with Claude Code's sign-in (OAuth)",
-        oauthEnableHint: "Off by default. In the background (every 2 minutes while you have the menu open, slowing to every 30 when you haven't looked for hours) and when you click ↻, AIUsage reads Claude Code's sign-in token from the Keychain (macOS asks first: choose Always Allow; it may ask again after an AIUsage update) and asks Anthropic's usage endpoint, the one behind Claude Code's /usage screen. Free: no tokens, never starts a 5-hour window, and it also sees usage from the desktop app and claude.ai. The endpoint is undocumented, and Anthropic's terms reserve Pro and Max sign-in tokens for Claude Code and claude.ai: use at your own risk. AIUsage keeps the token in memory only, never writes it anywhere, and never renews it.",
+        oauthEnableHint: "Off by default. In the background (every 2 minutes while you have the menu open, slowing to every 30 when you haven't looked for hours) and when you click ↻, AIUsage reads Claude Code's sign-in token from the Keychain (with macOS's `security` tool, as Claude Code does, so no prompt shows) and asks Anthropic's usage endpoint, the one behind Claude Code's /usage screen. Free: no tokens, never starts a 5-hour window, and it also sees usage from the desktop app and claude.ai. The endpoint is undocumented, and Anthropic's terms reserve Pro and Max sign-in tokens for Claude Code and claude.ai: use at your own risk. AIUsage keeps the token in memory only, never writes it anywhere, and never renews it itself: when it expires, AIUsage briefly starts Claude Code in the background, which renews it.",
         oauthRefreshHint: "Asks the OAuth usage endpoint. Free; never starts a 5-hour window.",
         oauthReread: "Re-read sign-in",
         oauthRereadHint: "After switching accounts in Claude Code (/login), read the new sign-in now. Otherwise AIUsage keeps using the old one until it expires. macOS may ask for Keychain access.",
@@ -481,7 +481,7 @@ struct Strings {
         probeNoEvent: "输出里没有 rate_limit_event（API key 用户没有订阅额度）",
 
         oauthEnable: "用 Claude Code 的登录凭据查询用量（OAuth）",
-        oauthEnableHint: "默认关闭。开启后在后台定时（刚打开过菜单时每 2 分钟，几小时没看则放慢到每 30 分钟）以及点 ↻ 时，AIUsage 从钥匙串读取 Claude Code 的登录令牌（macOS 会先询问，选“始终允许”；AIUsage 更新后可能会再问一次），去请求 Anthropic 的用量接口，也就是 Claude Code /usage 页面用的那个。免费：不消耗 tokens，不会开启 5 小时窗口，桌面端和 claude.ai 上的用量也能看到。该接口没有官方文档，而且 Anthropic 条款规定 Pro / Max 的登录令牌只能用于 Claude Code 和 claude.ai：风险自负。AIUsage 只把令牌留在内存里，不写入任何地方，也不续期。",
+        oauthEnableHint: "默认关闭。开启后在后台定时（刚打开过菜单时每 2 分钟，几小时没看则放慢到每 30 分钟）以及点 ↻ 时，AIUsage 从钥匙串读取 Claude Code 的登录令牌（和 Claude Code 一样通过 macOS 的 `security` 工具读取，不会弹窗），去请求 Anthropic 的用量接口，也就是 Claude Code /usage 页面用的那个。免费：不消耗 tokens，不会开启 5 小时窗口，桌面端和 claude.ai 上的用量也能看到。该接口没有官方文档，而且 Anthropic 条款规定 Pro / Max 的登录令牌只能用于 Claude Code 和 claude.ai：风险自负。AIUsage 只把令牌留在内存里，不写入任何地方，自己也不续期：令牌过期时，AIUsage 会在后台短暂启动一次 Claude Code，由它来续期。",
         oauthRefreshHint: "请求 OAuth 用量接口。免费，不会开启 5 小时窗口。",
         oauthReread: "重新读取登录凭据",
         oauthRereadHint: "在 Claude Code 里切换账号（/login）后，点这里立即读取新的登录凭据；否则 AIUsage 会继续用旧的，直到它过期。macOS 可能会询问钥匙串权限。",
