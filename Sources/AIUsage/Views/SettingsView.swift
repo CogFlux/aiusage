@@ -5,15 +5,27 @@ import SwiftUI
 /// `SettingsPresenter` builds, the way macOS settings windows look.
 struct SettingsView: View {
     enum Tab: CaseIterable {
-        case general, claudeCode, codex, deepseek, sync
+        case general, claudeCode, codex, opencodeGo, deepseek, sync
 
         func title(_ s: Strings) -> String {
             switch self {
             case .general: return s.general
             case .claudeCode: return s.claudeCode
             case .codex: return "Codex"
+            case .opencodeGo: return "OpenCode Go"
             case .deepseek: return "DeepSeek"
             case .sync: return s.syncTab
+            }
+        }
+
+        /// The provider whose logo marks the tab; nil for the others, which use `symbol`.
+        var provider: Provider? {
+            switch self {
+            case .claudeCode: return .claude
+            case .codex: return .codex
+            case .opencodeGo: return .opencodego
+            case .deepseek: return .deepseek
+            case .general, .sync: return nil
             }
         }
 
@@ -22,6 +34,7 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .claudeCode: return "terminal"
             case .codex: return "chevron.left.forwardslash.chevron.right"
+            case .opencodeGo: return "curlybraces"
             case .deepseek: return "creditcard"
             case .sync: return "arrow.up.circle"
             }
@@ -34,6 +47,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var codex: CodexStore
+    @EnvironmentObject var opencodeGo: OpenCodeGoStore
     @EnvironmentObject var updater: Updater
     @EnvironmentObject var sync: SyncStore
 
@@ -45,6 +59,7 @@ struct SettingsView: View {
             case .general: generalTab
             case .claudeCode: claudeCodeTab
             case .codex: codexTab
+            case .opencodeGo: opencodeGoTab
             case .deepseek: deepseekTab
             case .sync: syncTab
             }
@@ -66,10 +81,10 @@ struct SettingsView: View {
 
             layoutSection
 
-            // The 5h/7d choice only matters while the menu bar shows Claude or Codex.
-            if !Set(store.layout.menuBar(enabled: enabledProviders)).isDisjoint(with: [.claude, .codex]) {
+            // The 5h/7d choice only matters while the menu bar shows a provider with those windows.
+            if !Set(store.layout.menuBar(enabled: enabledProviders)).isDisjoint(with: [.claude, .codex, .opencodego]) {
                 Picker(s.menuBarShows, selection: $store.menuBarKind) {
-                    ForEach(WindowKind.allCases, id: \.self) { kind in
+                    ForEach(WindowKind.claudeKinds, id: \.self) { kind in
                         Text(kind.shortLabel).tag(kind)
                     }
                 }
@@ -138,6 +153,7 @@ struct SettingsView: View {
         var set: Set<Provider> = store.enabled ? [.claude] : []
         if codex.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
+        if opencodeGo.enabled { set.insert(.opencodego) }
         return set
     }
 
@@ -159,7 +175,7 @@ struct SettingsView: View {
         let onlyMenuBarItem = store.layout.menuBar(enabled: enabledProviders) == [provider]
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(name(provider))
+                Text(provider.displayName)
                 if !enabled, let tab = settingsTab(provider) {
                     Text(s.layoutProviderOff(tab.title(s))).font(.caption).foregroundStyle(.secondary)
                 }
@@ -194,20 +210,13 @@ struct SettingsView: View {
         }
     }
 
-    private func name(_ provider: Provider) -> String {
-        switch provider {
-        case .claude: return "Claude"
-        case .codex: return "Codex"
-        case .deepseek: return "DeepSeek"
-        }
-    }
-
     /// Where a provider is switched on.
     private func settingsTab(_ provider: Provider) -> Tab? {
         switch provider {
         case .claude: return .claudeCode
         case .codex: return .codex
         case .deepseek: return .deepseek
+        case .opencodego: return .opencodeGo
         }
     }
 
@@ -257,6 +266,59 @@ struct SettingsView: View {
             s.codexPaidThrough($0.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(store.locale)))
         }
         return ([codex.planLabel].compactMap { $0 } + windows + [until].compactMap { $0 }).joined(separator: " · ")
+    }
+
+    // MARK: OpenCode Go
+
+    private var opencodeGoTab: some View {
+        Form {
+            Section {
+                Toggle(isOn: $opencodeGo.enabled) {
+                    Text(s.opencodeGoEnable)
+                    Text(s.opencodeGoEnableHint)
+                }
+            }
+
+            // Everything below follows the switch above.
+            Group {
+                Section {
+                    HStack {
+                        SecureField(s.deepseekAPIKey, text: $opencodeGo.apiKeyDraft,
+                                    prompt: Text(opencodeGo.hasAPIKey ? "••••••••" : "oc_sk_…"))
+                            .onSubmit(opencodeGo.saveTypedAPIKey)
+                        Button(s.deepseekSave, action: opencodeGo.saveTypedAPIKey)
+                            .disabled(opencodeGo.apiKeyDraft.isEmpty)
+                    }
+                    Text(opencodeGo.apiKeyJustSaved ? s.deepseekAPIKeySaved : s.opencodeGoAPIKeyHint)
+                        .font(.caption).foregroundStyle(opencodeGo.apiKeyJustSaved ? .green : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .top) {
+                        if let error = opencodeGo.lastError {
+                            Text(error).font(.caption)
+                                .foregroundStyle(opencodeGo.errorIsMinor ? Color.secondary : .red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if let summary = opencodeGoSummary {
+                            Text(summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if opencodeGo.isRefreshing {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button(s.codexRefresh) { opencodeGo.refresh() }
+                            .disabled(!opencodeGo.hasAPIKey || opencodeGo.isRefreshing)
+                    }
+                }
+            }
+            .disabled(!opencodeGo.enabled)
+        }
+        .formStyle(.grouped)
+    }
+
+    /// "5h 6% · 7d 12% · mo 3%"
+    private var opencodeGoSummary: String? {
+        guard let usage = opencodeGo.usage else { return nil }
+        return usage.windows.map { "\($0.kind.shortLabel) \(UsageFormatter.percent($0.usedPercent))" }
+            .joined(separator: " · ")
     }
 
     private var deepseekTab: some View {

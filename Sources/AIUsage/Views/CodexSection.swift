@@ -19,7 +19,7 @@ struct CodexSection: View {
             }
             if codex.usage != nil {
                 Divider()
-                ForEach(WindowKind.allCases, id: \.self) { kind in
+                ForEach(WindowKind.claudeKinds, id: \.self) { kind in
                     WindowRow(kind: kind,
                               window: codex.usage?.window(kind),
                               pace: codex.pace(for: kind),

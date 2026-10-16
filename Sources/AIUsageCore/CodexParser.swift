@@ -101,6 +101,6 @@ public enum CodexParser {
     }
 
     static func kind(forMinutes minutes: Double) -> WindowKind? {
-        WindowKind.allCases.first { abs($0.duration / 60 - minutes) < 1 }
+        WindowKind.claudeKinds.first { abs($0.duration / 60 - minutes) < 1 }
     }
 }

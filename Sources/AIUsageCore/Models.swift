@@ -1,15 +1,21 @@
 import Foundation
 
-/// A rate-limit window as Claude exposes it. Every data source (statusline JSON, `claude -p`
-/// stream-json, the OAuth usage endpoint) reports these two windows.
+/// A rate-limit window. Claude's data sources (statusline JSON, `claude -p` stream-json, the OAuth
+/// usage endpoint) and Codex report the 5-hour and 7-day ones; OpenCode Go adds a monthly one.
 public enum WindowKind: String, Codable, CaseIterable, Hashable, Sendable {
     case fiveHour = "five_hour"
     case sevenDay = "seven_day"
+    case month
 
+    /// The windows Claude reports, and Codex too.
+    public static let claudeKinds: [WindowKind] = [.fiveHour, .sevenDay]
+
+    /// Nominal for `.month`, whose real length follows the calendar; see `UsageWindow.startsAt`.
     public var duration: TimeInterval {
         switch self {
         case .fiveHour: return 5 * 3600
         case .sevenDay: return 7 * 86400
+        case .month: return 30 * 86400
         }
     }
 
@@ -17,6 +23,7 @@ public enum WindowKind: String, Codable, CaseIterable, Hashable, Sendable {
         switch self {
         case .fiveHour: return "5h"
         case .sevenDay: return "7d"
+        case .month: return "mo"
         }
     }
 }
@@ -42,9 +49,20 @@ public struct UsageWindow: Codable, Equatable, Sendable {
         self.creditAt = creditAt
     }
 
-    /// Claude only reports the reset time; the window is assumed to be
-    /// exactly `kind.duration` long, so its start is derived.
-    public var startsAt: Date { resetsAt.addingTimeInterval(-kind.duration) }
+    /// Only the reset time is reported; the window is assumed to be exactly `kind.duration` long, so
+    /// its start is derived. A month starts one calendar month (UTC) before its reset.
+    public var startsAt: Date {
+        if kind == .month, let start = Self.utcCalendar.date(byAdding: .month, value: -1, to: resetsAt) {
+            return start
+        }
+        return resetsAt.addingTimeInterval(-kind.duration)
+    }
+
+    private static let utcCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
 }
 
 public enum SnapshotSource: String, Codable, Sendable {
@@ -240,7 +258,7 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
         windows.forEach(remember)
 
         var merged = incoming
-        merged.windows = WindowKind.allCases.compactMap { kind in
+        merged.windows = WindowKind.claudeKinds.compactMap { kind in
             var result: UsageWindow?
             switch (window(kind), incoming.window(kind)) {
             case let (current?, new?):

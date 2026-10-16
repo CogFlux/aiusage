@@ -17,7 +17,7 @@ public enum OAuthUsageParser {
             throw InvalidJSON()
         }
         var windows: [UsageWindow] = []
-        for kind in WindowKind.allCases {
+        for kind in WindowKind.claudeKinds {
             guard let w = root[kind.rawValue] as? [String: Any],
                   let used = JSONNumber.double(w["utilization"]),
                   let resets = (w["resets_at"] as? String).flatMap(parseTimestamp) else { continue }

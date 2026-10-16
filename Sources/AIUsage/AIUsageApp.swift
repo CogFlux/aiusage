@@ -6,6 +6,7 @@ struct AIUsageApp: App {
     @StateObject private var store: UsageStore
     @StateObject private var deepseek: DeepSeekStore
     @StateObject private var codex: CodexStore
+    @StateObject private var opencodeGo: OpenCodeGoStore
     @StateObject private var updater: Updater
     @StateObject private var sync: SyncStore
 
@@ -30,6 +31,8 @@ struct AIUsageApp: App {
         _deepseek = StateObject(wrappedValue: deepseek)
         let codex = CodexStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
         _codex = StateObject(wrappedValue: codex)
+        let opencodeGo = OpenCodeGoStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
+        _opencodeGo = StateObject(wrappedValue: opencodeGo)
         let updater = Updater()
         _updater = StateObject(wrappedValue: updater)
         let sync = SyncStore(store: store, codex: codex)
@@ -39,6 +42,7 @@ struct AIUsageApp: App {
                 .environmentObject(store)
                 .environmentObject(deepseek)
                 .environmentObject(codex)
+                .environmentObject(opencodeGo)
                 .environmentObject(updater)
                 .environmentObject(sync)
         }
@@ -54,6 +58,8 @@ struct AIUsageApp: App {
                 return codex.menuBarTitle(kind: store.menuBarKind, compact: store.compactMenuBar)
             case .deepseek:
                 return deepseek.menuBarTitle(compact: store.compactMenuBar)
+            case .opencodego:
+                return opencodeGo.menuBarTitle(kind: store.menuBarKind, compact: store.compactMenuBar)
             }
         })
     }
@@ -62,6 +68,7 @@ struct AIUsageApp: App {
         var set: Set<Provider> = store.enabled ? [.claude] : []
         if codex.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
+        if opencodeGo.enabled { set.insert(.opencodego) }
         return set
     }
 
@@ -81,7 +88,7 @@ struct AIUsageApp: App {
                 encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                 encoder.dateEncodingStrategy = .iso8601
                 print(String(decoding: try encoder.encode(snap), as: UTF8.self))
-                for kind in WindowKind.allCases {
+                for kind in WindowKind.claudeKinds {
                     if let w = snap.window(kind) {
                         let pace = PaceCalculator.compute(window: w, now: Date())
                         print(UsageFormatter.menuBarTitle(kind: kind, pace: pace, stale: false),
@@ -134,6 +141,7 @@ struct AIUsageApp: App {
                 .environmentObject(store)
                 .environmentObject(deepseek)
                 .environmentObject(codex)
+                .environmentObject(opencodeGo)
                 .environmentObject(updater)
         } label: {
             // With every provider off there is nothing to show, but the item must stay clickable.

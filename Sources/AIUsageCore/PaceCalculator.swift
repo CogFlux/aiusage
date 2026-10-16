@@ -6,15 +6,15 @@ public struct PaceConfig: Equatable, Sendable {
     /// Before this much of a window (or of the stretch after a re-pace checkpoint) has passed,
     /// the projection divides by ~0 and is withheld. Per window: a fixed fraction would keep the
     /// 7-day projection hidden for most of a day, which is longer than anyone waits.
-    public var minElapsed: [WindowKind: TimeInterval] = [.fiveHour: 15 * 60, .sevenDay: 60 * 60]
+    public var minElapsed: [WindowKind: TimeInterval] = [.fiveHour: 15 * 60, .sevenDay: 60 * 60, .month: 12 * 3600]
 
     public func minElapsed(for kind: WindowKind) -> TimeInterval {
         minElapsed[kind] ?? 15 * 60
     }
     /// |delta| within this band counts as on track. Per window: the 5-hour window moves in
     /// bursts and needs slack; the 7-day window is smooth, and a 5-point miss there is a
-    /// day's worth of quota, so it gets a tighter band.
-    public var onTrackTolerance: [WindowKind: Double] = [.fiveHour: 5, .sevenDay: 3]
+    /// day's worth of quota, so it gets a tighter band. A month is as smooth (DeepSeek's budget uses 3 too).
+    public var onTrackTolerance: [WindowKind: Double] = [.fiveHour: 5, .sevenDay: 3, .month: 3]
 
     public func tolerance(for kind: WindowKind) -> Double {
         onTrackTolerance[kind] ?? 5

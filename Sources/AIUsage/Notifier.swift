@@ -71,6 +71,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         if alert.provider == CodexStore.provider, let kind = alert.rateLimitWindow {
             return strings.codexWindowTitle(kind)
         }
+        if alert.provider == OpenCodeGoStore.provider, let kind = alert.rateLimitWindow {
+            return strings.opencodeGoWindowTitle(kind)
+        }
         if alert.windowID == DeepSeekStore.windowID { return strings.deepseekBudgetTitle }
         return alert.windowID
     }

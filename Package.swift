@@ -23,7 +23,7 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/AIUsage",
-            resources: [.copy("Resources/aiusage-statusline.sh")],
+            resources: [.copy("Resources/aiusage-statusline.sh"), .copy("Resources/ProviderIcons")],
             linkerSettings: [
                 // Sparkle.framework is embedded in Contents/Frameworks by scripts/build-app.sh.
                 .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),

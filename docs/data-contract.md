@@ -260,6 +260,36 @@ Codex also writes the same numbers into its session logs (`~/.codex/sessions/**/
 events with a snake_case `rate_limits` object) after every model response. They are not read: the poll is
 free and fresher.
 
+### 1.8 OpenCode Go (subscription)
+
+OpenCode Go reports three windows: a rolling 5 hours, a calendar week (resets Monday 00:00 UTC) and a month
+anchored at the subscription date. The usage endpoint CodexBar reads, `GET https://opencode.ai/zen/go/v1/usage`,
+takes the subscription's API key as a Bearer token and returns them; it is undocumented (OpenCode's docs point at
+the web console only) and costs nothing:
+
+```json
+{"usage":{"rolling":{"status":"ok","percent":3,"resetsAt":"2026-10-16T08:04:12.250Z"},
+          "weekly":{"status":"ok","percent":1,"resetsAt":"2026-10-19T00:00:00.000Z"},
+          "monthly":{"status":"ok","percent":0,"resetsAt":"2026-11-03T09:30:00.000Z"}}}
+```
+
+- `percent` is 0...100 (clamped); `resetsAt` is ISO 8601, and a numeric `resetInSec` (seen by CodexBar) is also
+  accepted. `rolling` is required, the others are optional. `status` is not interpreted; a window at 100% shows
+  "Limit reached".
+- `rolling`, `weekly`, `monthly` become `.fiveHour`, `.sevenDay` and `.month` windows. A month starts one calendar
+  month (UTC) before its reset, so the pace line follows the real month length. Month pacing: tolerance 3,
+  projection after 12 h, running-out lead 2 days, over-pace cooldown 24 h (DeepSeek's budget values). Claude and
+  Codex keep only the 5-hour and 7-day windows (`WindowKind.claudeKinds`).
+- While nothing has been used, `rolling` reports 0% with a reset five hours from the request, so the window
+  slides with each poll until usage starts it.
+- Polling, re-pacing, credits and alerts work as for Codex (§1.7), with the store's own keys; the provider id in
+  alert ids is `opencodego`. The menu bar shows the 5-hour or 7-day window chosen for Claude.
+- The API key is kept as DeepSeek's (§1.6), in `~/Library/Application Support/AIUsage/opencode-go.key` with mode
+  0600, and is sent only to this endpoint. OpenCode's own stores (`auth.json`, its database) are not read. HTTP
+  401/403 is reported as a rejected key. Readings are not uploaded to the sync server.
+- Not used: the console's cookie-authenticated JSON (`/console/api/go/status`) and server functions, which need a
+  browser session, and OpenCode's local cost history, which covers one device only and estimates the limits.
+
 ## 2. Unified model
 
 ```

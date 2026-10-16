@@ -2,7 +2,7 @@
 
 [English](README.md) · 中文
 
-macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可选加上 Codex（ChatGPT 套餐）额度和 DeepSeek 余额与燃烧率，以及 **pace**：按"窗口结束时恰好用到 99%"
+macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可选加上 Codex（ChatGPT 套餐）和 OpenCode Go 额度、DeepSeek 余额与燃烧率，以及 **pace**：按"窗口结束时恰好用到 99%"
 的均速折算，现在应该用到多少、实际用了多少、超了还是省了、照这个速度什么时候用完。
 
 ```
@@ -58,9 +58,17 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 
 ## 显示内容与顺序
 
-设置 → 通用 → 显示内容与顺序 列出 Claude、Codex、DeepSeek。每一项可以分别勾选是否在主界面（菜单）显示、是否在菜单栏显示，
-并用上 / 下箭头调整顺序：主界面从上到下、菜单栏从左到右都按这个顺序。菜单栏显示多个服务时用 ` · ` 分隔，
-例如 `5h 42% ▲9 · 5h 6% ● · ¥42`，不带服务名前缀，靠顺序区分。Codex 和 DeepSeek 要先在各自的页里打开才会出现。
+设置 → 通用 → 显示内容与顺序 列出 Claude、Codex、OpenCode Go、DeepSeek。每一项可以分别勾选是否在主界面（菜单）显示、是否在菜单栏显示，
+并用上 / 下箭头调整顺序。主界面显示多个服务时，顶部有一排切换按钮：每个服务的图标下面是各窗口（5 小时、7 天、每月；DeepSeek 为预算或余额）各一条细进度条，颜色表示 pace，下面显示选中服务的详情。切换栏和菜单栏都按这个顺序从左到右排列。图标来自 [CodexBar](https://github.com/steipete/CodexBar)（MIT）。菜单栏显示多个服务时用 ` · ` 分隔，
+例如 `5h 42% ▲9 · 5h 6% ● · ¥42`，不带服务名前缀，靠顺序区分。其他服务要先在各自的页里打开才会出现。
+
+## OpenCode Go
+
+设置 → OpenCode Go。填入 Go 订阅的 API key（OpenCode 控制台里的那个，也就是 OpenCode 的 `/connect` 要的 key）后，App 从
+OpenCode 的用量接口（`opencode.ai/zen/go/v1/usage`，CodexBar 读的那个）读取 5 小时、每周和每月额度，查询间隔与 Codex 相同。
+免费，不发送模型请求。三个窗口的 pace 算法与 Claude 相同，并共用同一组通知开关；菜单栏显示 5 小时或 7 天窗口，跟 Claude
+的选择一致。key 以仅本人可读的权限保存在 `~/Library/Application Support/AIUsage/` 下，只会发送给 `opencode.ai`。
+该接口没有官方文档，可能会变。
 
 ## DeepSeek
 
@@ -131,5 +139,6 @@ MIT，见 [LICENSE](LICENSE)。
 - [x] DeepSeek 余额、燃烧率与月预算 pace
 - [x] 可自定义的展开面板：选择显示哪些 provider 区块及其顺序（如只显示 Claude，或把 DeepSeek 放在 Claude 上面）
 - [x] Codex
+- [x] OpenCode Go
 - [ ] 其他 provider（Cursor …）
 - [x] 开机自启、通知（超速 / 即将用尽 / 窗口重置）

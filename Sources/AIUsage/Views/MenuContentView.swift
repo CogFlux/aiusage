@@ -5,7 +5,10 @@ struct MenuContentView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var codex: CodexStore
+    @EnvironmentObject var opencodeGo: OpenCodeGoStore
     @Environment(\.dismiss) private var dismiss
+    /// An object rather than `@State`, which is a macro the Command Line Tools cannot expand.
+    @StateObject private var providerBlocksHeight = MeasuredHeight()
 
     private var s: Strings { store.strings }
 
@@ -13,23 +16,29 @@ struct MenuContentView: View {
         var enabled: Set<Provider> = store.enabled ? [.claude] : []
         if codex.enabled { enabled.insert(.codex) }
         if deepseek.enabled { enabled.insert(.deepseek) }
+        if opencodeGo.enabled { enabled.insert(.opencodego) }
         return store.layout.panel(enabled: enabled)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             let providers = panelProviders
-            if providers.isEmpty {
-                caption(s.panelEmpty)
+            if providers.count > 1 {
+                ProviderSwitcher(providers: providers, selected: selectedProvider(among: providers))
+                Divider()
             }
-            ForEach(Array(providers.enumerated()), id: \.element) { index, provider in
-                if index > 0 { ProviderDivider() }
-                switch provider {
-                case .claude: claudeSection
-                case .codex: CodexSection()
-                case .deepseek: DeepSeekSection()
-                }
+            // A block can still be taller than the screen (Claude with its hook prompt on a small
+            // display). It scrolls then, and the footer stays in view; until then the scroll view
+            // is exactly the block's height.
+            ScrollView(.vertical) {
+                providerBlocks
+                    .padding(.trailing, providerBlocksHeight.value > maxProviderBlocksHeight ? 10 : 0)
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ProviderBlocksHeight.self, value: geo.size.height)
+                    })
             }
+            .frame(height: min(providerBlocksHeight.value, maxProviderBlocksHeight))
+            .onPreferenceChange(ProviderBlocksHeight.self) { providerBlocksHeight.value = $0 }
             Divider()
             footer
         }
@@ -40,9 +49,38 @@ struct MenuContentView: View {
             store.menuOpened()
             deepseek.tick()
             codex.tick()
+            opencodeGo.tick()
             // Picks up a `claude` installed since the last look.
             if store.resolvedClaudePath == nil { store.refreshClaudePath() }
         }
+    }
+
+    /// The saved choice while it is shown, else the first provider in the layout's order.
+    private func selectedProvider(among providers: [Provider]) -> Provider {
+        store.panelSelection.flatMap { providers.contains($0) ? $0 : nil } ?? providers[0]
+    }
+
+    /// The selected provider's block; with only one provider shown there is no switcher, just it.
+    @ViewBuilder
+    private var providerBlocks: some View {
+        let providers = panelProviders
+        if providers.isEmpty {
+            caption(s.panelEmpty)
+        } else {
+            switch selectedProvider(among: providers) {
+            case .claude: claudeSection
+            case .codex: CodexSection()
+            case .deepseek: DeepSeekSection()
+            case .opencodego: OpenCodeGoSection()
+            }
+        }
+    }
+
+    /// The screen's height below the menu bar and above the Dock, less the footer, the padding and a
+    /// margin, so the whole panel always fits.
+    private var maxProviderBlocksHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return max(200, screen - 110)
     }
 
     private var claudeSection: some View {
@@ -57,7 +95,7 @@ struct MenuContentView: View {
                 caption(s.noQuotaInData)
             }
             Divider()
-            ForEach(WindowKind.allCases, id: \.self) { kind in
+            ForEach(WindowKind.claudeKinds, id: \.self) { kind in
                 WindowRow(kind: kind,
                           window: store.snapshot?.window(kind),
                           pace: store.pace(for: kind),
@@ -324,17 +362,6 @@ struct WindowRow: View {
     }
 }
 
-/// Boundary between providers: heavier and more spaced than the thin dividers used inside one
-/// provider's block, so the two levels of grouping read differently.
-struct ProviderDivider: View {
-    var body: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.18))
-            .frame(height: 2)
-            .padding(.vertical, 6)
-    }
-}
-
 /// Used fill plus a tick at the even-pace budget so the gap is visible at a glance.
 /// With a checkpoint, two more ticks: a faint one where the original budget line would be, and
 /// a dashed one at the checkpoint the re-paced budget now grows from.
@@ -392,4 +419,14 @@ struct PaceBar: View {
         case .reset: return .gray
         }
     }
+}
+
+/// The provider blocks' natural height, as laid out inside the scroll view.
+private struct ProviderBlocksHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+final class MeasuredHeight: ObservableObject {
+    @Published var value: CGFloat = 0
 }

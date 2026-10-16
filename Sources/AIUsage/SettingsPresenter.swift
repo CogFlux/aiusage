@@ -55,7 +55,9 @@ enum SettingsPresenter {
             page.sizingOptions = [.minSize]
             page.preferredContentSize = page.view.fittingSize
             let item = NSTabViewItem(viewController: page)
-            item.image = NSImage(systemSymbolName: tab.symbol, accessibilityDescription: nil)
+            // Logos a little under the toolbar's symbol size, which they would otherwise outweigh.
+            item.image = tab.provider.flatMap { ProviderIcon.image($0, fittingSquare: 20) }
+                ?? NSImage(systemSymbolName: tab.symbol, accessibilityDescription: nil)
             tabs.addTabViewItem(item)
         }
         let window = NSWindow(contentViewController: tabs)

@@ -47,12 +47,12 @@ public struct UsageAlert: Equatable, Sendable {
 
 public struct AlertConfig: Equatable, Sendable {
     /// How close `runoutAt` must be before `runningOut` fires, per Claude window.
-    public var runningOutLead: [WindowKind: TimeInterval] = [.fiveHour: 30 * 60, .sevenDay: 12 * 3600]
+    public var runningOutLead: [WindowKind: TimeInterval] = [.fiveHour: 30 * 60, .sevenDay: 12 * 3600, .month: 2 * 86400]
     /// Hysteresis for `overPace`: after firing, delta must fall to `tolerance − rearmMargin` before
     /// the alert can fire again. Capped at half the tolerance so a tight band keeps some re-arm room.
     public var rearmMargin: Double = 2
     /// Minimum time between two `overPace` alerts for the same window instance, per Claude window.
-    public var overPaceCooldown: [WindowKind: TimeInterval] = [.fiveHour: 60 * 60, .sevenDay: 6 * 3600]
+    public var overPaceCooldown: [WindowKind: TimeInterval] = [.fiveHour: 60 * 60, .sevenDay: 6 * 3600, .month: 24 * 3600]
     /// A drop of at least this many points inside a live window counts as a quota reset credit.
     /// Matches `MergePolicy.creditDropPoints`, the only drop the merge lets through.
     public var quotaRestoredDropPoints: Double = 5

@@ -13,7 +13,7 @@ public enum ProbeParser {
                   let unified = info["unifiedWindows"] as? [String: Any] else { continue }
 
             var windows: [UsageWindow] = []
-            for kind in WindowKind.allCases {
+            for kind in WindowKind.claudeKinds {
                 guard let w = unified[kind.rawValue] as? [String: Any],
                       let utilization = JSONNumber.double(w["utilization"]),
                       let resets = JSONNumber.double(w["resetsAt"]) else { continue }

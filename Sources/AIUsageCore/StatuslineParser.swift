@@ -15,7 +15,7 @@ public enum StatuslineParser {
         guard let rateLimits = root["rate_limits"] as? [String: Any] else { return nil }
 
         var windows: [UsageWindow] = []
-        for kind in WindowKind.allCases {
+        for kind in WindowKind.claudeKinds {
             guard let w = rateLimits[kind.rawValue] as? [String: Any],
                   let used = JSONNumber.double(w["used_percentage"]),
                   let resets = JSONNumber.double(w["resets_at"]) else { continue }

@@ -3,7 +3,7 @@
 English · [中文](README.zh-CN.md)
 
 A macOS menu bar app that shows your Claude subscription quota (5-hour and 7-day windows) — and, optionally,
-your Codex (ChatGPT plan) quota and your DeepSeek balance and burn rate — together with **pace**: assuming you want to land at exactly 99% when the window resets, how much should be used by now,
+your Codex (ChatGPT plan) and OpenCode Go quotas and your DeepSeek balance and burn rate — together with **pace**: assuming you want to land at exactly 99% when the window resets, how much should be used by now,
 how much actually is, whether you are ahead or behind, and when you would run out at the current rate.
 
 ```
@@ -68,12 +68,23 @@ share its notification switches; the menu bar shows them in the same form, `5h 6
 paid through come from the claims of the ID token Codex keeps in `~/.codex/auth.json`; only those claims are read. Requires the Codex CLI, signed in
 with a ChatGPT account (`codex login`). Details in [docs/data-contract.md](docs/data-contract.md).
 
+## OpenCode Go
+
+Settings → OpenCode Go. Paste the API key of your Go subscription (from the OpenCode console, the one OpenCode's
+`/connect` takes) and the app reads the 5-hour, weekly and monthly limits from OpenCode's usage endpoint
+(`opencode.ai/zen/go/v1/usage`, the one CodexBar reads) on the same adaptive cadence as Codex. Free: no model
+requests. All three windows are paced like Claude's and share its notification switches; the menu bar shows the
+5-hour or 7-day one, as chosen for Claude. The key is stored owner-only under `~/Library/Application Support/AIUsage/`
+and is sent only to `opencode.ai`. The endpoint is undocumented and may change.
+
 ## Layout
 
-Settings → General → Layout lists Claude, Codex and DeepSeek. For each: whether the menu shows it, whether the
-menu bar shows it, and up / down to reorder — the menu reads top to bottom and the menu bar left to right in
-that order. With more than one provider in the menu bar the items are joined by ` · `, e.g.
-`5h 42% ▲9 · 5h 6% ● · ¥42`, with no provider labels — the order tells them apart. Codex and DeepSeek appear once they
+Settings → General → Layout lists Claude, Codex, OpenCode Go and DeepSeek. For each: whether the menu shows it, whether the
+menu bar shows it, and up / down to reorder. With more than one provider in the menu, a switcher across its top
+shows each one's logo over a thin bar per window (5-hour, 7-day, month; DeepSeek's budget, or its balance), coloured
+by pace, and below it the selected provider's block; the switcher and the menu bar both follow this order, left
+to right. The logos come from [CodexBar](https://github.com/steipete/CodexBar) (MIT). With more than one provider in the menu bar the items are joined by ` · `, e.g.
+`5h 42% ▲9 · 5h 6% ● · ¥42`, with no provider labels — the order tells them apart. The others appear once they
 are turned on in their own tabs.
 
 ## DeepSeek
@@ -149,5 +160,6 @@ MIT — see [LICENSE](LICENSE).
 - [x] DeepSeek balance, burn rate and monthly budget pace
 - [x] Customizable popover: choose which provider blocks are shown and in what order (e.g. Claude only, or DeepSeek above Claude)
 - [x] Codex
+- [x] OpenCode Go
 - [ ] Other providers (Cursor …)
 - [x] Launch at login, notifications (over pace / running out / window reset)

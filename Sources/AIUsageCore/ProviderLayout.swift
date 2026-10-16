@@ -4,10 +4,11 @@ public enum Provider: String, Codable, CaseIterable, Hashable, Sendable {
     case claude
     case codex
     case deepseek
+    case opencodego
 }
 
 /// Which providers the popover and the menu bar show, and in what order. One order serves both,
-/// so the menu bar reads left to right the way the popover reads top to bottom.
+/// so the menu bar reads left to right the way the popover's switcher does.
 public struct ProviderLayout: Codable, Equatable, Sendable {
     public var order: [Provider]
     /// Opt-out, so a provider the user turns on later shows up without a second step.
@@ -42,7 +43,7 @@ public struct ProviderLayout: Codable, Equatable, Sendable {
         order += Provider.allCases.filter { !seen.contains($0) }
     }
 
-    /// Popover blocks, top to bottom.
+    /// Popover switcher tabs, left to right.
     public func panel(enabled: Set<Provider>) -> [Provider] {
         order.filter { enabled.contains($0) && !hiddenInPanel.contains($0) }
     }

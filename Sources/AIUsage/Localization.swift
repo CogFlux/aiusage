@@ -44,6 +44,7 @@ struct Strings {
     // Windows
     let fiveHourTitle: String
     let sevenDayTitle: String
+    let monthTitle: String
     let resetsLine: (_ time: String, _ countdown: String) -> String
     let used: String
     let budget: String
@@ -156,6 +157,15 @@ struct Strings {
     let codexNetworkError: String
     /// "paid through Nov 4"
     let codexPaidThrough: (_ date: String) -> String
+    let opencodeGoEnable: String
+    let opencodeGoEnableHint: String
+    let opencodeGoAPIKeyHint: String
+    let opencodeGoNoKey: String
+    let opencodeGoUnauthorized: String
+    let opencodeGoServerError: (_ status: Int) -> String
+    let opencodeGoMalformed: String
+    let opencodeGoNetworkError: String
+    let opencodeGoWindowIdle: String
 
     // Layout
     let layout: String
@@ -246,6 +256,7 @@ struct Strings {
         switch kind {
         case .fiveHour: return fiveHourTitle
         case .sevenDay: return sevenDayTitle
+        case .month: return monthTitle
         }
     }
 
@@ -258,6 +269,10 @@ struct Strings {
         "Codex " + windowTitle(kind)
     }
 
+    func opencodeGoWindowTitle(_ kind: AIUsageCore.WindowKind) -> String {
+        "OpenCode Go " + windowTitle(kind)
+    }
+
     static let en = Strings(
         waitingForData: "Waiting for data",
         sourceStatusline: "statusline",
@@ -266,6 +281,7 @@ struct Strings {
 
         fiveHourTitle: "5-hour window",
         sevenDayTitle: "7-day window",
+        monthTitle: "Monthly window",
         resetsLine: { time, countdown in "Resets \(time) · in \(countdown)" },
         used: "Used",
         budget: "Budget",
@@ -368,9 +384,18 @@ struct Strings {
         codexServerError: { message in "Codex: \(message). If you are not signed in, run `codex login` in Terminal." },
         codexNetworkError: "Codex could not reach chatgpt.com (network error). It will try again at the next refresh.",
         codexPaidThrough: { "renews \($0)" },
+        opencodeGoEnable: "Track OpenCode Go quota",
+        opencodeGoEnableHint: "Reads your OpenCode Go subscription's 5-hour, weekly and monthly limits from OpenCode's usage endpoint (the one CodexBar reads): every 2 minutes after you open the menu, slowing to every 15 minutes while you are away, and whenever you click ↻. Free: no model requests. The endpoint is undocumented and may change.",
+        opencodeGoAPIKeyHint: "The API key of your Go subscription from the OpenCode console, the one you give OpenCode's /connect. Stored in ~/Library/Application Support/AIUsage/opencode-go.key (owner-only permissions) and sent only to opencode.ai.",
+        opencodeGoNoKey: "Add your OpenCode Go API key in Settings → OpenCode Go.",
+        opencodeGoUnauthorized: "OpenCode rejected the API key. Check it in Settings → OpenCode Go, and that the Go subscription is active.",
+        opencodeGoServerError: { "OpenCode answered HTTP \($0). It will try again at the next refresh." },
+        opencodeGoMalformed: "OpenCode's answer had no quota in it. The endpoint may have changed, or the key has no Go subscription.",
+        opencodeGoNetworkError: "Could not reach opencode.ai (network error). It will try again at the next refresh.",
+        opencodeGoWindowIdle: "OpenCode Go reported no such window.",
 
         layout: "Layout",
-        layoutHint: "What the menu and the menu bar show, top to bottom and left to right.",
+        layoutHint: "What the menu's switcher and the menu bar show, in this order from left to right.",
         layoutPanel: "Menu",
         layoutMenuBar: "Menu bar",
         layoutMoveUp: "Move up",
@@ -446,6 +471,7 @@ struct Strings {
 
         fiveHourTitle: "5 小时窗口",
         sevenDayTitle: "7 天窗口",
+        monthTitle: "每月窗口",
         resetsLine: { time, countdown in "重置 \(time) · \(countdown) 后" },
         used: "已用",
         budget: "预算",
@@ -548,9 +574,18 @@ struct Strings {
         codexServerError: { message in "Codex：\(message)。如果尚未登录，请在终端运行 `codex login`。" },
         codexNetworkError: "Codex 无法连接 chatgpt.com（网络错误），下次刷新时会再试。",
         codexPaidThrough: { "\($0) 续费" },
+        opencodeGoEnable: "跟踪 OpenCode Go 额度",
+        opencodeGoEnableHint: "从 OpenCode 的用量接口（CodexBar 读的那个）读取 OpenCode Go 订阅的 5 小时、每周和每月额度：打开菜单后每 2 分钟一次，离开时放慢到每 15 分钟一次，点 ↻ 时也会刷新。免费：不发送模型请求。该接口没有官方文档，可能会变。",
+        opencodeGoAPIKeyHint: "OpenCode 控制台里 Go 订阅的 API key，也就是在 OpenCode 的 /connect 里填的那个。保存在 ~/Library/Application Support/AIUsage/opencode-go.key（仅本人可读），只会发送给 opencode.ai。",
+        opencodeGoNoKey: "请在 设置 → OpenCode Go 填写 OpenCode Go 的 API key。",
+        opencodeGoUnauthorized: "OpenCode 拒绝了这个 API key。请在 设置 → OpenCode Go 检查 key，并确认 Go 订阅仍有效。",
+        opencodeGoServerError: { "OpenCode 返回 HTTP \($0)，下次刷新时会再试。" },
+        opencodeGoMalformed: "OpenCode 的返回里没有额度数据。可能接口变了，或者这个 key 没有 Go 订阅。",
+        opencodeGoNetworkError: "无法连接 opencode.ai（网络错误），下次刷新时会再试。",
+        opencodeGoWindowIdle: "OpenCode Go 没有报告这个窗口。",
 
         layout: "显示内容与顺序",
-        layoutHint: "主界面（菜单）和菜单栏显示哪些服务，按从上到下、从左到右的顺序。",
+        layoutHint: "主界面（菜单）顶部的切换栏和菜单栏显示哪些服务，都按这个顺序从左到右排列。",
         layoutPanel: "主界面",
         layoutMenuBar: "菜单栏",
         layoutMoveUp: "上移",

@@ -104,7 +104,9 @@ enum CodexChecks {
         let claude = UsageAlert(kind: .overPace, windowID: "claude.seven_day", resetsAt: at, pace: pace)
         Harness.equal(claude.claudeWindow, .sevenDay, "Claude window")
         let deepseek = UsageAlert(kind: .overPace, windowID: "deepseek.month", resetsAt: at, pace: pace)
-        Harness.equal(deepseek.rateLimitWindow, nil, "a budget is no rate-limit window")
+        // Its suffix names a month, as OpenCode Go's does; alerts tell the two apart by provider.
+        Harness.equal(deepseek.provider, "deepseek", "a budget belongs to DeepSeek")
+        Harness.equal(deepseek.claudeWindow, nil, "a budget is no Claude window")
         let window = UsageWindow(kind: .sevenDay, usedPercent: 10, resetsAt: at)
         Harness.equal(PaceWindow.rateLimit(window, provider: "codex").id, "codex.seven_day", "pace window id")
         Harness.equal(PaceWindow.claude(window), PaceWindow.rateLimit(window, provider: "claude"), "claude is a rate-limit window")
@@ -112,7 +114,7 @@ enum CodexChecks {
 
     static func layoutKeepsEveryProviderOnce() {
         let layout = ProviderLayout(order: [.deepseek, .deepseek, .claude])
-        Harness.equal(layout.order, [.deepseek, .claude, .codex], "deduped, missing appended")
+        Harness.equal(layout.order, [.deepseek, .claude, .codex, .opencodego], "deduped, missing appended")
         Harness.equal(ProviderLayout().order, Provider.allCases, "default order")
     }
 
@@ -131,17 +133,17 @@ enum CodexChecks {
     static func layoutMovesWithinBounds() {
         var layout = ProviderLayout()
         layout.move(.deepseek, by: -1)
-        Harness.equal(layout.order, [.claude, .deepseek, .codex], "moved up")
+        Harness.equal(layout.order, [.claude, .deepseek, .codex, .opencodego], "moved up")
         layout.move(.claude, by: -1)
-        Harness.equal(layout.order, [.claude, .deepseek, .codex], "top stays")
+        Harness.equal(layout.order, [.claude, .deepseek, .codex, .opencodego], "top stays")
         layout.move(.claude, by: 5)
-        Harness.equal(layout.order, [.deepseek, .codex, .claude], "clamped to the bottom")
+        Harness.equal(layout.order, [.deepseek, .codex, .opencodego, .claude], "clamped to the bottom")
     }
 
     static func layoutSurvivesUnknownProviders() {
         let json = #"{"order":["deepseek","cursor","claude"],"hiddenInPanel":["cursor"],"inMenuBar":["deepseek"]}"#
         let layout = try? JSONDecoder().decode(ProviderLayout.self, from: Data(json.utf8))
-        Harness.equal(layout?.order, [.deepseek, .claude, .codex], "unknown dropped, missing appended")
+        Harness.equal(layout?.order, [.deepseek, .claude, .codex, .opencodego], "unknown dropped, missing appended")
         Harness.equal(layout?.inMenuBar, [.deepseek], "menu bar kept")
         let roundTrip = (try? JSONEncoder().encode(layout)).flatMap { try? JSONDecoder().decode(ProviderLayout.self, from: $0) }
         Harness.equal(roundTrip, layout, "round trip")

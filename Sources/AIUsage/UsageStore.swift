@@ -26,6 +26,7 @@ final class UsageStore: ObservableObject {
         /// Superseded by `layout`; read once to carry the choice over.
         static let menuBarProvider = "menuBarProvider"
         static let layout = "providerLayout"
+        static let panelSelection = "panelSelection"
         static let checkpoints = "paceCheckpoints"
         static let restorePoints = "paceRestorePoints"
         static let lastSnapshot = "lastSnapshot"
@@ -152,6 +153,10 @@ final class UsageStore: ObservableObject {
     @Published var layout: ProviderLayout {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(layout), forKey: Keys.layout) }
     }
+    /// The provider the panel's switcher shows; any shown one when it is not among them.
+    @Published var panelSelection: Provider? {
+        didSet { UserDefaults.standard.set(panelSelection?.rawValue, forKey: Keys.panelSelection) }
+    }
     var notificationsSupported: Bool { notifier.isSupported }
     /// Persisted, so a relaunch does not repeat notifications that already fired.
     private var alertTracker = AlertTracker()
@@ -197,6 +202,7 @@ final class UsageStore: ObservableObject {
             let previous = Provider(rawValue: defaults.string(forKey: Keys.menuBarProvider) ?? "") ?? .claude
             layout = ProviderLayout(inMenuBar: [previous])
         }
+        panelSelection = defaults.string(forKey: Keys.panelSelection).flatMap(Provider.init(rawValue:))
         claudePathOverride = defaults.string(forKey: Keys.claudePath) ?? ""
         menuBarKind = WindowKind(rawValue: defaults.string(forKey: Keys.menuBarKind) ?? "") ?? .fiveHour
         let storedLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
@@ -451,7 +457,7 @@ final class UsageStore: ObservableObject {
     /// and deleting rather than ignoring it stops usage climbing past the old base from reviving a
     /// line anchored before the credit — and the credit itself becomes the sensible pace origin.
     private func recordQuotaRestores(since previous: UsageSnapshot?) {
-        for kind in WindowKind.allCases {
+        for kind in WindowKind.claudeKinds {
             // Only a change inside one instance is a new credit; switching to another account's
             // window brings that window's own, older credit along.
             guard let after = snapshot?.window(kind), let creditAt = after.creditAt,
