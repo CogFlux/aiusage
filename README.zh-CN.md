@@ -70,6 +70,14 @@ OpenCode 的用量接口（`opencode.ai/zen/go/v1/usage`，CodexBar 读的那个
 的选择一致。key 以仅本人可读的权限保存在 `~/Library/Application Support/AIUsage/` 下，只会发送给 `opencode.ai`。
 该接口没有官方文档，可能会变。
 
+## 用量图表
+
+点服务商标题栏里的图表按钮，会在该区块里展开一张用量随时间变化的折线图：横轴是一个窗口从开始到重置，
+虚线是匀速配速线，用 ‹ › 可以往回翻看之前的窗口（5 小时窗口保留一周，7 天窗口保留五周，月度窗口保留两个月）。
+各数据源只报告当前数值，所以历史从这个版本第一次运行时开始记录，保存在
+`~/Library/Application Support/AIUsage/history-<provider>.json`。没有读数的时段（Mac 睡眠、没有轮询）画成点线。
+DeepSeek 的图是最近 30 天的余额。
+
 ## DeepSeek
 
 设置 → DeepSeek。填入 API key 后，App 每 5 分钟查询一次免费的余额接口，从余额变化推算今日 / 本月花费和每天燃烧率，
@@ -140,5 +148,6 @@ MIT，见 [LICENSE](LICENSE)。
 - [x] 可自定义的展开面板：选择显示哪些 provider 区块及其顺序（如只显示 Claude，或把 DeepSeek 放在 Claude 上面）
 - [x] Codex
 - [x] OpenCode Go
+- [x] 用量随时间变化的图表
 - [ ] 其他 provider（Cursor …）
 - [x] 开机自启、通知（超速 / 即将用尽 / 窗口重置）

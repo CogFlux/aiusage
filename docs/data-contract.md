@@ -368,6 +368,25 @@ precedence over the credit's, and clearing it falls back to the credit's rather 
 5 points; `quotaRestoredCooldown` keeps one credit reported by two sources to one notification) notifies,
 since no `windowReset` can fire here.
 
+### History (usage chart)
+
+Each provider's windows are also recorded over time, as `UsageHistory`, for the popover's chart. Claude records
+its merged snapshot (a window kept from an older reading keeps its older `observedAt` and adds nothing); Codex
+and OpenCode Go record every reading.
+
+```
+Instance { kind, resetsAt, points: [Point] }        one window instance; same instance within 120 s of resetsAt
+Point    { at, usedPercent, until }                  a change point; `until` = last time the same value was seen
+```
+
+- A reading at or after its own `resetsAt`, or not later than the last point's `until`, is ignored.
+- A reading equal to the last point only moves `until`; a different one appends a point.
+- Instances are dropped once they ended longer ago than 7 days (5-hour), 35 days (7-day) or 62 days (month).
+- Drawing: each point is held from `at` to `until`, then joined to the next. A gap between `until` and the next
+  `at` longer than 35 min (5-hour), 3 h (7-day) or 6 h (month) is drawn as unmeasured.
+- Stored as JSON in `~/Library/Application Support/AIUsage/history-<provider>.json`. A new point is written at
+  once; a mere confirmation at most every 5 minutes.
+
 ## 3. Pace calculation
 
 Parameters (`PaceConfig`, defaults):

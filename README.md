@@ -87,6 +87,15 @@ to right. The logos come from [CodexBar](https://github.com/steipete/CodexBar) (
 `5h 42% ▲9 · 5h 6% ● · ¥42`, with no provider labels — the order tells them apart. The others appear once they
 are turned on in their own tabs.
 
+## Usage chart
+
+The chart button in a provider's header opens a chart of used percentage over time inside its block: one window
+from its start to its reset, against the dashed even-pace line, with ‹ › to page back through earlier windows (a
+week of 5-hour windows, five weeks of 7-day ones, two months of monthly ones). The sources report only current
+numbers, so the history starts when this version first runs; it is kept in
+`~/Library/Application Support/AIUsage/history-<provider>.json`. Stretches with no readings (the Mac asleep,
+nothing polling) are drawn dotted. DeepSeek's chart is its balance over the last 30 days.
+
 ## DeepSeek
 
 Settings → DeepSeek. Paste an API key and the app polls the free balance endpoint every 5 minutes, derives
@@ -161,5 +170,6 @@ MIT — see [LICENSE](LICENSE).
 - [x] Customizable popover: choose which provider blocks are shown and in what order (e.g. Claude only, or DeepSeek above Claude)
 - [x] Codex
 - [x] OpenCode Go
+- [x] Usage-over-time chart
 - [ ] Other providers (Cursor …)
 - [x] Launch at login, notifications (over pace / running out / window reset)

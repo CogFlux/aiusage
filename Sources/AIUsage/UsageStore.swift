@@ -27,6 +27,7 @@ final class UsageStore: ObservableObject {
         static let menuBarProvider = "menuBarProvider"
         static let layout = "providerLayout"
         static let panelSelection = "panelSelection"
+        static let chartProviders = "panelCharts"
         static let checkpoints = "paceCheckpoints"
         static let restorePoints = "paceRestorePoints"
         static let lastSnapshot = "lastSnapshot"
@@ -157,6 +158,10 @@ final class UsageStore: ObservableObject {
     @Published var panelSelection: Provider? {
         didSet { UserDefaults.standard.set(panelSelection?.rawValue, forKey: Keys.panelSelection) }
     }
+    /// The providers whose block shows its usage chart, opened from the block's header.
+    @Published var chartProviders: Set<Provider> {
+        didSet { UserDefaults.standard.set(chartProviders.map(\.rawValue).sorted(), forKey: Keys.chartProviders) }
+    }
     var notificationsSupported: Bool { notifier.isSupported }
     /// Persisted, so a relaunch does not repeat notifications that already fired.
     private var alertTracker = AlertTracker()
@@ -178,6 +183,8 @@ final class UsageStore: ObservableObject {
     var locale: Locale { language.resolved.locale }
 
     let config = PaceConfig()
+    /// The merged readings over time, for the panel's chart.
+    let history = HistoryStore(provider: "claude")
     /// Data older than this gets a ⧗ marker in the menu bar.
     let staleAfter: TimeInterval = 30 * 60
 
@@ -203,6 +210,7 @@ final class UsageStore: ObservableObject {
             layout = ProviderLayout(inMenuBar: [previous])
         }
         panelSelection = defaults.string(forKey: Keys.panelSelection).flatMap(Provider.init(rawValue:))
+        chartProviders = Set((defaults.stringArray(forKey: Keys.chartProviders) ?? []).compactMap(Provider.init(rawValue:)))
         claudePathOverride = defaults.string(forKey: Keys.claudePath) ?? ""
         menuBarKind = WindowKind(rawValue: defaults.string(forKey: Keys.menuBarKind) ?? "") ?? .fiveHour
         let storedLanguage = AppLanguage(rawValue: defaults.string(forKey: Keys.language) ?? "") ?? .system
@@ -317,6 +325,14 @@ final class UsageStore: ObservableObject {
             if enabled {
                 notifier.deliver(alert, strings: strings, locale: locale)
             }
+        }
+    }
+
+    func toggleChart(_ provider: Provider) {
+        if chartProviders.contains(provider) {
+            chartProviders.remove(provider)
+        } else {
+            chartProviders.insert(provider)
         }
     }
 
@@ -447,6 +463,9 @@ final class UsageStore: ObservableObject {
         }
         let previous = snapshot
         snapshot = snapshot?.merging(incoming, provenance: provenance) ?? incoming
+        // The merged numbers, as the panel shows them; a window kept from before keeps its older
+        // `observedAt` and so records nothing new.
+        history.record(snapshot?.windows ?? [])
         now = Date()
         recordQuotaRestores(since: previous)
         evaluateAlerts()

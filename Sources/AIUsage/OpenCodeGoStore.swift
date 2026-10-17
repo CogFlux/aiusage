@@ -56,6 +56,8 @@ final class OpenCodeGoStore: ObservableObject {
     @Published private(set) var lastErrorIsNetwork = false
 
     let config = PaceConfig()
+    /// Every reading, for the panel's chart.
+    let history = HistoryStore(provider: OpenCodeGoStore.provider)
     private let notifier: Notifier
     private let strings: () -> Strings
     private let locale: () -> Locale
@@ -174,6 +176,7 @@ final class OpenCodeGoStore: ObservableObject {
                 let fresh = try await OpenCodeGoClient.fetch(apiKey: key)
                 checkpoints.recordCredits(from: usage?.windows ?? [], to: fresh.windows)
                 usage = fresh
+                history.record(fresh.windows)
                 lastError = nil
                 lastErrorIsNetwork = false
             } catch OpenCodeGoClient.ClientError.network {

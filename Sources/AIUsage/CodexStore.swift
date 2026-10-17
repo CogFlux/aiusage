@@ -67,6 +67,8 @@ final class CodexStore: ObservableObject {
     @Published private(set) var lastErrorIsNetwork = false
 
     let config = PaceConfig()
+    /// Every reading, for the panel's chart.
+    let history = HistoryStore(provider: "codex")
     private let notifier: Notifier
     private let strings: () -> Strings
     private let locale: () -> Locale
@@ -191,6 +193,7 @@ final class CodexStore: ObservableObject {
                 // Before `usage`, so whoever observes the new usage also sees the current plan.
                 subscription = Self.readSubscription()
                 usage = fresh
+                history.record(fresh.windows)
                 lastError = nil
                 lastErrorIsNetwork = false
             } catch CodexProbe.ProbeError.network {

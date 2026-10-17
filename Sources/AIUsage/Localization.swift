@@ -167,6 +167,13 @@ struct Strings {
     let opencodeGoNetworkError: String
     let opencodeGoWindowIdle: String
 
+    // Usage chart
+    let chartToggle: String
+    let chartEmpty: String
+    let chartGap: String
+    let chartEarlier: String
+    let chartLater: String
+
     // Layout
     let layout: String
     let layoutHint: String
@@ -394,6 +401,12 @@ struct Strings {
         opencodeGoNetworkError: "Could not reach opencode.ai (network error). It will try again at the next refresh.",
         opencodeGoWindowIdle: "OpenCode Go reported no such window.",
 
+        chartToggle: "Usage over time",
+        chartEmpty: "No readings recorded for this window yet. AIUsage keeps the history from now on.",
+        chartGap: "No readings",
+        chartEarlier: "Earlier window",
+        chartLater: "Later window",
+
         layout: "Layout",
         layoutHint: "What the menu's switcher and the menu bar show, in this order from left to right.",
         layoutPanel: "Menu",
@@ -583,6 +596,12 @@ struct Strings {
         opencodeGoMalformed: "OpenCode 的返回里没有额度数据。可能接口变了，或者这个 key 没有 Go 订阅。",
         opencodeGoNetworkError: "无法连接 opencode.ai（网络错误），下次刷新时会再试。",
         opencodeGoWindowIdle: "OpenCode Go 没有报告这个窗口。",
+
+        chartToggle: "用量随时间变化",
+        chartEmpty: "这个窗口还没有记录。AIUsage 从现在开始保存历史。",
+        chartGap: "无读数",
+        chartEarlier: "上一个窗口",
+        chartLater: "下一个窗口",
 
         layout: "显示内容与顺序",
         layoutHint: "主界面（菜单）顶部的切换栏和菜单栏显示哪些服务，都按这个顺序从左到右排列。",

@@ -94,6 +94,12 @@ struct MenuContentView: View {
             } else if store.fileHasNoQuota, store.snapshot == nil {
                 caption(s.noQuotaInData)
             }
+            if store.chartProviders.contains(.claude) {
+                UsageChart(kinds: WindowKind.claudeKinds, history: store.history,
+                           current: { store.snapshot?.window($0) },
+                           checkpoint: { store.pace(for: $0)?.checkpoint },
+                           now: store.now)
+            }
             Divider()
             ForEach(WindowKind.claudeKinds, id: \.self) { kind in
                 WindowRow(kind: kind,
@@ -134,6 +140,7 @@ struct MenuContentView: View {
             } else {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
             }
+            ChartToggle(provider: .claude)
             Button {
                 store.probe()
             } label: {

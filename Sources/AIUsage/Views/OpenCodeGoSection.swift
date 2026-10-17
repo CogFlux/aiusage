@@ -19,6 +19,12 @@ struct OpenCodeGoSection: View {
                 Text(s.opencodeGoNoKey).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if store.chartProviders.contains(.opencodego) {
+                UsageChart(kinds: OpenCodeGoStore.kinds, history: go.history,
+                           current: { go.usage?.window($0) },
+                           checkpoint: { go.pace(for: $0)?.checkpoint },
+                           now: go.now)
+            }
             if go.usage != nil {
                 Divider()
                 ForEach(OpenCodeGoStore.kinds, id: \.self) { kind in
@@ -57,6 +63,7 @@ struct OpenCodeGoSection: View {
             } else {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
             }
+            ChartToggle(provider: .opencodego)
             // Free (no tokens), so a plain icon, as for Codex.
             Button {
                 go.refresh()

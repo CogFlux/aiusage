@@ -17,6 +17,12 @@ struct CodexSection: View {
                 Text(error).font(.caption).foregroundStyle(codex.errorIsMinor ? Color.secondary : .red)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if store.chartProviders.contains(.codex) {
+                UsageChart(kinds: WindowKind.claudeKinds, history: codex.history,
+                           current: { codex.usage?.window($0) },
+                           checkpoint: { codex.pace(for: $0)?.checkpoint },
+                           now: codex.now)
+            }
             if codex.usage != nil {
                 Divider()
                 ForEach(WindowKind.claudeKinds, id: \.self) { kind in
@@ -62,6 +68,7 @@ struct CodexSection: View {
             } else {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
             }
+            ChartToggle(provider: .codex)
             // Free (no tokens), so a plain icon rather than Claude's button-with-cost-hint.
             Button {
                 codex.refresh()

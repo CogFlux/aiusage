@@ -18,6 +18,7 @@ struct DeepSeekSection: View {
                 } else if let observed = deepseek.ledger.lastObservedAt {
                     Text(age(observed)).font(.caption).foregroundStyle(.secondary)
                 }
+                ChartToggle(provider: .deepseek)
                 // Free (no tokens), so a plain icon rather than Claude's button-with-cost-hint.
                 Button {
                     deepseek.refresh()
@@ -29,6 +30,9 @@ struct DeepSeekSection: View {
                 .disabled(!deepseek.hasAPIKey || deepseek.isRefreshing)
             }
 
+            if deepseek.hasAPIKey, store.chartProviders.contains(.deepseek) {
+                BalanceChart()
+            }
             if !deepseek.hasAPIKey {
                 Text(s.deepseekNoKey).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
