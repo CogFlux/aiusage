@@ -261,7 +261,8 @@ struct SettingsView: View {
     /// "Plus · 5h 6% · 7d 12%"
     private var codexSummary: String? {
         guard let usage = codex.usage else { return nil }
-        let windows = usage.windows.map { "\($0.kind.shortLabel) \(UsageFormatter.percent($0.usedPercent))" }
+        let windows = codex.displayedWindowKinds.compactMap { usage.window($0) }
+            .map { "\($0.kind.shortLabel) \(UsageFormatter.percent($0.usedPercent))" }
         let until = codex.subscription?.activeUntil.map {
             s.codexPaidThrough($0.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(store.locale)))
         }

@@ -171,6 +171,11 @@ struct Strings {
     let chartToggle: String
     let chartEmpty: String
     let chartGap: String
+    let chartInspect: String
+    let chartRecorded: String
+    let chartInterpolated: String
+    let chartGapEstimate: String
+    let chartHeld: String
     let chartEarlier: String
     let chartLater: String
 
@@ -404,6 +409,11 @@ struct Strings {
         chartToggle: "Usage over time",
         chartEmpty: "No readings recorded for this window yet. AIUsage keeps the history from now on.",
         chartGap: "No readings",
+        chartInspect: "Click near a line to inspect its value. Filled dots are recorded readings; hollow dots are estimates or budget values. Click empty space or the selected point to dismiss.",
+        chartRecorded: "Recorded",
+        chartInterpolated: "Interpolated",
+        chartGapEstimate: "Gap estimate",
+        chartHeld: "Last known balance",
         chartEarlier: "Earlier window",
         chartLater: "Later window",
 
@@ -600,6 +610,11 @@ struct Strings {
         chartToggle: "用量随时间变化",
         chartEmpty: "这个窗口还没有记录。AIUsage 从现在开始保存历史。",
         chartGap: "无读数",
+        chartInspect: "点击线段附近查看数值。实心点为实际记录，空心点为估算或预算值。点击空白处或选中点可取消。",
+        chartRecorded: "实际记录",
+        chartInterpolated: "插值估算",
+        chartGapEstimate: "无读数区间估算",
+        chartHeld: "沿用上次余额",
         chartEarlier: "上一个窗口",
         chartLater: "下一个窗口",
 

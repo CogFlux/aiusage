@@ -18,14 +18,14 @@ struct CodexSection: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if store.chartProviders.contains(.codex) {
-                UsageChart(kinds: WindowKind.claudeKinds, history: codex.history,
+                UsageChart(kinds: codex.displayedWindowKinds, history: codex.history,
                            current: { codex.usage?.window($0) },
                            checkpoint: { codex.pace(for: $0)?.checkpoint },
                            now: codex.now)
             }
             if codex.usage != nil {
                 Divider()
-                ForEach(WindowKind.claudeKinds, id: \.self) { kind in
+                ForEach(codex.displayedWindowKinds, id: \.self) { kind in
                     WindowRow(kind: kind,
                               window: codex.usage?.window(kind),
                               pace: codex.pace(for: kind),

@@ -7,6 +7,11 @@ import Foundation
 /// The claims are as fresh as the token: Codex refreshes it now and then, so right after a renewal
 /// `activeUntil` can still show the old date for a while.
 public struct CodexSubscription: Codable, Equatable, Sendable {
+    public static func isProPlan(_ plan: String?) -> Bool {
+        guard let plan = plan?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else { return false }
+        return plan == "pro" || plan == "prolite" || plan.hasPrefix("pro_") || plan.hasPrefix("pro-")
+    }
+
     /// "plus", "pro", … as the claims name it.
     public var plan: String?
     public var activeStart: Date?

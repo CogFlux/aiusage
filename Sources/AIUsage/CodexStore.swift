@@ -239,6 +239,15 @@ final class CodexStore: ObservableObject {
 
     // MARK: Derived
 
+    /// Pro hides the 5-hour quota across all display surfaces. Prefer the probed plan;
+    /// the sign-in claim is a fallback until the backend reports one.
+    var displayedWindowKinds: [WindowKind] {
+        let reportedPlan = usage?.planType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let plan = reportedPlan.flatMap { $0.isEmpty || $0 == "unknown" ? nil : $0 }
+            ?? subscription?.plan?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return CodexSubscription.isProPlan(plan) ? [.sevenDay] : WindowKind.claudeKinds
+    }
+
     func pace(for kind: WindowKind) -> Pace? {
         usage?.window(kind).map {
             PaceCalculator.compute(window: $0, now: now, config: config, checkpoint: checkpoints.checkpoint(for: $0))
@@ -288,8 +297,9 @@ final class CodexStore: ObservableObject {
 
     /// Same form as Claude's: "5h 6% ●", compact "6%".
     func menuBarTitle(kind: WindowKind, compact: Bool) -> String {
-        UsageFormatter.menuBarTitle(kind: kind, pace: pace(for: kind), stale: isStale,
-                                    compact: compact, idle: isIdle(kind))
+        let displayedKind = displayedWindowKinds.contains(kind) ? kind : .sevenDay
+        return UsageFormatter.menuBarTitle(kind: displayedKind, pace: pace(for: displayedKind), stale: isStale,
+                                           compact: compact, idle: isIdle(displayedKind))
     }
 
     // MARK: Alerts
