@@ -6,6 +6,7 @@ struct AIUsageApp: App {
     @StateObject private var store: UsageStore
     @StateObject private var deepseek: DeepSeekStore
     @StateObject private var codex: CodexStore
+    @StateObject private var openAIAPICredits: OpenAIAPICreditsStore
     @StateObject private var opencodeGo: OpenCodeGoStore
     @StateObject private var updater: Updater
     @StateObject private var sync: SyncStore
@@ -31,6 +32,8 @@ struct AIUsageApp: App {
         _deepseek = StateObject(wrappedValue: deepseek)
         let codex = CodexStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
         _codex = StateObject(wrappedValue: codex)
+        let openAIAPICredits = OpenAIAPICreditsStore()
+        _openAIAPICredits = StateObject(wrappedValue: openAIAPICredits)
         let opencodeGo = OpenCodeGoStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
         _opencodeGo = StateObject(wrappedValue: opencodeGo)
         let updater = Updater()
@@ -42,6 +45,7 @@ struct AIUsageApp: App {
                 .environmentObject(store)
                 .environmentObject(deepseek)
                 .environmentObject(codex)
+                .environmentObject(openAIAPICredits)
                 .environmentObject(opencodeGo)
                 .environmentObject(updater)
                 .environmentObject(sync)
@@ -55,6 +59,7 @@ struct AIUsageApp: App {
             case .claude:
                 return store.menuBarTitle
             case .codex:
+                guard codex.enabled else { return "GPT API" }
                 return codex.menuBarTitle(kind: store.menuBarKind, compact: store.compactMenuBar)
             case .deepseek:
                 return deepseek.menuBarTitle(compact: store.compactMenuBar)
@@ -66,7 +71,7 @@ struct AIUsageApp: App {
 
     private var enabledProviders: Set<Provider> {
         var set: Set<Provider> = store.enabled ? [.claude] : []
-        if codex.enabled { set.insert(.codex) }
+        if codex.enabled || openAIAPICredits.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
         if opencodeGo.enabled { set.insert(.opencodego) }
         return set
@@ -141,6 +146,7 @@ struct AIUsageApp: App {
                 .environmentObject(store)
                 .environmentObject(deepseek)
                 .environmentObject(codex)
+                .environmentObject(openAIAPICredits)
                 .environmentObject(opencodeGo)
                 .environmentObject(updater)
         } label: {

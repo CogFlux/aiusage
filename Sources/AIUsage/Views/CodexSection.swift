@@ -5,10 +5,21 @@ import SwiftUI
 struct CodexSection: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var codex: CodexStore
+    @EnvironmentObject var openAIAPICredits: OpenAIAPICreditsStore
 
     private var s: Strings { store.strings }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if codex.enabled { subscription }
+            if openAIAPICredits.enabled {
+                if codex.enabled { Divider() }
+                OpenAIAPICreditsRow()
+            }
+        }
+    }
+
+    private var subscription: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             if !codex.codexInstalled {

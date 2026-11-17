@@ -157,6 +157,42 @@ struct Strings {
     let codexNetworkError: String
     /// "paid through Nov 4"
     let codexPaidThrough: (_ date: String) -> String
+
+    // OpenAI API credits
+    let openAIAPICreditsTitle: String
+    let openAIAPICreditsEnable: String
+    let openAIAPICreditsHint: String
+    let openAIAPIAdminKey: String
+    let openAIAPIKeyHint: String
+    let openAIAPIRemoveKey: String
+    let openAIAPIAllowance: String
+    let openAIAPISubscriptionRenewal: String
+    let openAIAPIEstimatedRenewal: String
+    let openAIAPIEstimatedReset: (_ date: String, _ countdown: String) -> String
+    let openAIAPICycleUnavailable: String
+    let openAIAPICreateKey: String
+    let openAIAPIBilling: String
+    let openAIAPISpend: (_ spend: String, _ allowance: String) -> String
+    let openAIAPIRemaining: (_ remaining: String) -> String
+    let openAIAPIUpdated: (_ time: String) -> String
+    let openAIAPISetup: String
+    let openAIAPIKeyFileError: String
+    let openAIAPIInvalidKey: String
+    let openAIAPIUnauthorized: String
+    let openAIAPIHTTPError: (_ status: Int) -> String
+    let openAIAPIMalformed: String
+    let openAIAPINetworkError: String
+
+    func openAIAPIIssue(_ issue: OpenAIAPICreditsStore.Issue) -> String {
+        switch issue {
+        case .keyFile: return openAIAPIKeyFileError
+        case .invalidKey: return openAIAPIInvalidKey
+        case .unauthorized: return openAIAPIUnauthorized
+        case let .http(status): return openAIAPIHTTPError(status)
+        case .malformed: return openAIAPIMalformed
+        case .network: return openAIAPINetworkError
+        }
+    }
     let opencodeGoEnable: String
     let opencodeGoEnableHint: String
     let opencodeGoAPIKeyHint: String
@@ -381,7 +417,7 @@ struct Strings {
         alertLowBalanceBody: { amount, runout in runout.map { "\(amount) left — runs out around \($0) at the current rate." } ?? "\(amount) left." },
 
         codexEnable: "Track Codex quota",
-        codexEnableHint: "Reads the 5-hour and weekly windows of your ChatGPT plan through the Codex CLI (`codex app-server`) every 5 minutes and whenever you open the menu. A usage lookup, not a model request: free, and it uses no quota. Over-pace, running-out and reset notifications follow the switches in General.",
+        codexEnableHint: "Reads your ChatGPT plan's 5-hour and weekly windows through the Codex CLI (`codex app-server`). Refreshes about every 2 minutes after you open the menu and slows to about every 15 minutes while idle. The lookup uses no quota. Over-pace, running-out and reset notifications follow the switches in General.",
         codexRefresh: "Refresh now",
         codexPath: "codex path",
         codexPathPlaceholder: "Not found — enter full path",
@@ -396,6 +432,30 @@ struct Strings {
         codexServerError: { message in "Codex: \(message). If you are not signed in, run `codex login` in Terminal." },
         codexNetworkError: "Codex could not reach chatgpt.com (network error). It will try again at the next refresh.",
         codexPaidThrough: { "renews \($0)" },
+
+        openAIAPICreditsTitle: "OpenAI API credits",
+        openAIAPICreditsEnable: "Show API credit usage",
+        openAIAPICreditsHint: "Estimates remaining credits from organization spend and the allowance you enter. Uses the Codex refresh schedule. Check API billing for the actual balance.",
+        openAIAPIAdminKey: "Admin API key",
+        openAIAPIKeyHint: "Use an Admin API key from the organization that received the credits, with permission to read organization usage and costs. The key is stored locally with owner-only permissions and sent only to api.openai.com.",
+        openAIAPIRemoveKey: "Remove key",
+        openAIAPIAllowance: "Credit allowance (USD)",
+        openAIAPISubscriptionRenewal: "ChatGPT Pro renewal",
+        openAIAPIEstimatedRenewal: "Estimated ChatGPT Pro renewal",
+        openAIAPIEstimatedReset: { "Est. renewal \($0) · \($1)" },
+        openAIAPICycleUnavailable: "ChatGPT Pro billing dates are unavailable. Sign into Codex CLI with the ChatGPT Pro account linked to the credits and refresh.",
+        openAIAPICreateKey: "Manage Admin API keys",
+        openAIAPIBilling: "Open API billing",
+        openAIAPISpend: { "\($0) spent / \($1) allowance" },
+        openAIAPIRemaining: { "Est. \($0) left" },
+        openAIAPIUpdated: { "Last successful refresh \($0)" },
+        openAIAPISetup: "Set the Admin API key and credit allowance in Settings → Codex.",
+        openAIAPIKeyFileError: "Couldn't access the local OpenAI API key file.",
+        openAIAPIInvalidKey: "The key contains invalid characters. Copy it again from the API Platform.",
+        openAIAPIUnauthorized: "OpenAI denied access to organization costs. Use the linked organization's Admin API key with organization usage read access (api.usage.read).",
+        openAIAPIHTTPError: { "OpenAI cost lookup failed (HTTP \($0))." },
+        openAIAPIMalformed: "OpenAI returned an unexpected costs response.",
+        openAIAPINetworkError: "Couldn't connect to OpenAI to read costs.",
         opencodeGoEnable: "Track OpenCode Go quota",
         opencodeGoEnableHint: "Reads your OpenCode Go subscription's 5-hour, weekly and monthly limits from OpenCode's usage endpoint (the one CodexBar reads): every 2 minutes after you open the menu, slowing to every 15 minutes while you are away, and whenever you click ↻. Free: no model requests. The endpoint is undocumented and may change.",
         opencodeGoAPIKeyHint: "The API key of your Go subscription from the OpenCode console, the one you give OpenCode's /connect. Stored in ~/Library/Application Support/AIUsage/opencode-go.key (owner-only permissions) and sent only to opencode.ai.",
@@ -582,7 +642,7 @@ struct Strings {
         alertLowBalanceBody: { amount, runout in runout.map { "剩余 \(amount)，按当前速度约 \($0) 用完。" } ?? "剩余 \(amount)。" },
 
         codexEnable: "跟踪 Codex 额度",
-        codexEnableHint: "通过 Codex CLI（`codex app-server`）读取 ChatGPT 套餐的 5 小时和每周窗口，每 5 分钟一次，打开菜单时也会刷新。这是用量查询，不是模型请求：免费，不消耗额度。超速、即将用尽和重置通知沿用「通用」里的开关。",
+        codexEnableHint: "通过 Codex CLI（`codex app-server`）读取 ChatGPT 套餐的 5 小时和每周窗口。打开菜单后约每 2 分钟刷新一次，闲置时放慢到约每 15 分钟一次。查询不消耗额度。超速、即将用尽和重置通知沿用「通用」里的开关。",
         codexRefresh: "立即刷新",
         codexPath: "codex 路径",
         codexPathPlaceholder: "未找到，请填写完整路径",
@@ -597,6 +657,30 @@ struct Strings {
         codexServerError: { message in "Codex：\(message)。如果尚未登录，请在终端运行 `codex login`。" },
         codexNetworkError: "Codex 无法连接 chatgpt.com（网络错误），下次刷新时会再试。",
         codexPaidThrough: { "\($0) 续费" },
+
+        openAIAPICreditsTitle: "OpenAI API 额度",
+        openAIAPICreditsEnable: "显示 API 额度进度",
+        openAIAPICreditsHint: "根据 API 组织支出和填写的赠送额度估算剩余金额，沿用 Codex 的刷新频率。实际余额以 API 账单为准。",
+        openAIAPIAdminKey: "Admin API 密钥",
+        openAIAPIKeyHint: "使用收到赠送额度的 API 组织的 Admin API 密钥，需有读取组织用量与支出的权限。密钥保存在本机，仅本用户可读写，只发送给 api.openai.com。",
+        openAIAPIRemoveKey: "移除密钥",
+        openAIAPIAllowance: "赠送额度（美元）",
+        openAIAPISubscriptionRenewal: "ChatGPT Pro 续费日",
+        openAIAPIEstimatedRenewal: "预计 ChatGPT Pro 续费日",
+        openAIAPIEstimatedReset: { "预计 \($0) 续费 · \($1)" },
+        openAIAPICycleUnavailable: "暂时读不到 ChatGPT Pro 的账单周期。请在 Codex CLI 登录领取额度的 ChatGPT Pro 账号，然后刷新。",
+        openAIAPICreateKey: "管理 Admin API 密钥",
+        openAIAPIBilling: "打开 API 账单",
+        openAIAPISpend: { "已支出 \($0) / 额度 \($1)" },
+        openAIAPIRemaining: { "预计剩余 \($0)" },
+        openAIAPIUpdated: { "上次成功刷新 \($0)" },
+        openAIAPISetup: "在设置 → Codex 填写 Admin API 密钥和赠送额度。",
+        openAIAPIKeyFileError: "无法访问本地 OpenAI API 密钥文件。",
+        openAIAPIInvalidKey: "密钥包含无效字符，请从 API 平台重新复制。",
+        openAIAPIUnauthorized: "OpenAI 拒绝了组织支出查询。请使用已关联组织的 Admin API 密钥，并确认它有组织用量读取权限（api.usage.read）。",
+        openAIAPIHTTPError: { "OpenAI 支出查询失败（HTTP \($0)）。" },
+        openAIAPIMalformed: "OpenAI 返回了无法识别的支出数据。",
+        openAIAPINetworkError: "无法连接 OpenAI 查询支出。",
         opencodeGoEnable: "跟踪 OpenCode Go 额度",
         opencodeGoEnableHint: "从 OpenCode 的用量接口（CodexBar 读的那个）读取 OpenCode Go 订阅的 5 小时、每周和每月额度：打开菜单后每 2 分钟一次，离开时放慢到每 15 分钟一次，点 ↻ 时也会刷新。免费：不发送模型请求。该接口没有官方文档，可能会变。",
         opencodeGoAPIKeyHint: "OpenCode 控制台里 Go 订阅的 API key，也就是在 OpenCode 的 /connect 里填的那个。保存在 ~/Library/Application Support/AIUsage/opencode-go.key（仅本人可读），只会发送给 opencode.ai。",

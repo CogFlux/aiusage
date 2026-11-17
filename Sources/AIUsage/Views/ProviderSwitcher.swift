@@ -49,7 +49,8 @@ struct ProviderSwitcher: View {
     private func readings(_ provider: Provider) -> some View {
         switch provider {
         case .claude: bars(WindowKind.claudeKinds.map { store.pace(for: $0) })
-        case .codex: bars(codex.displayedWindowKinds.map { codex.pace(for: $0) })
+        case .codex:
+            if codex.enabled { bars(codex.displayedWindowKinds.map { codex.pace(for: $0) }) }
         case .opencodego: bars(OpenCodeGoStore.kinds.map { opencodeGo.pace(for: $0) })
         case .deepseek:
             if let pace = deepseek.budgetPace {

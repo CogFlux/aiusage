@@ -47,6 +47,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var codex: CodexStore
+    @EnvironmentObject var openAIAPICredits: OpenAIAPICreditsStore
     @EnvironmentObject var opencodeGo: OpenCodeGoStore
     @EnvironmentObject var updater: Updater
     @EnvironmentObject var sync: SyncStore
@@ -151,7 +152,7 @@ struct SettingsView: View {
 
     private var enabledProviders: Set<Provider> {
         var set: Set<Provider> = store.enabled ? [.claude] : []
-        if codex.enabled { set.insert(.codex) }
+        if codex.enabled || openAIAPICredits.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
         if opencodeGo.enabled { set.insert(.opencodego) }
         return set
@@ -254,6 +255,8 @@ struct SettingsView: View {
                 }
             }
             .disabled(!codex.enabled)
+
+            OpenAIAPICreditsSettings()
         }
         .formStyle(.grouped)
     }

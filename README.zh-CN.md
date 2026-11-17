@@ -56,6 +56,14 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 来自 Codex 保存在 `~/.codex/auth.json` 里的 ID token 声明，只读取这几项声明。需要安装 Codex CLI
 并用 ChatGPT 账户登录（`codex login`）。细节见 [docs/data-contract.md](docs/data-contract.md)。
 
+要跟踪 ChatGPT Pro 赠送的 API 额度，在 Codex 设置里开启 **显示 API 额度进度**。填写收到赠送额度的
+API 组织的 Admin API 密钥和获赠金额（美元）。密钥需要有读取组织用量与支出的权限。
+App 从 Codex CLI 登录读取 ChatGPT Pro 的账单周期。续费后如果登录信息尚未更新，下一期会标为预计。
+Codex 面板会显示组织支出、预计余额和配速。
+点 **从现在开始平均**，即可把余量平均分配到本周期剩余的时间。实际余额可通过设置里的 **打开 API 账单** 查看。
+密钥保存在 `~/Library/Application Support/AIUsage/openai-api.key`，仅本用户可读写。
+刷新频率与 Codex 相同，只调用 OpenAI 的支出查询接口。
+
 ## 显示内容与顺序
 
 设置 → 通用 → 显示内容与顺序 列出 Claude、Codex、OpenCode Go、DeepSeek。每一项可以分别勾选是否在主界面（菜单）显示、是否在菜单栏显示，

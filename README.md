@@ -68,6 +68,16 @@ share its notification switches; the menu bar shows them in the same form, `5h 6
 paid through come from the claims of the ID token Codex keeps in `~/.codex/auth.json`; only those claims are read. Requires the Codex CLI, signed in
 with a ChatGPT account (`codex login`). Details in [docs/data-contract.md](docs/data-contract.md).
 
+To track API credits from ChatGPT Pro, enable **Show API credit usage** in the Codex tab. Enter the
+Admin API key for the organization that received the credits, with permission to read organization
+usage and costs, and the granted amount in USD. The app uses the ChatGPT Pro billing period from
+your Codex CLI sign-in. If its dates are stale after renewal, the next period is marked as an estimate.
+The Codex panel shows organization spend, the estimated remainder, and
+the same pace controls as the subscription windows. Use **Re-pace from now** to spread the
+remaining allowance over the rest of the period. Open **API billing** in Settings for the actual balance. The key is
+stored in `~/Library/Application Support/AIUsage/openai-api.key` with owner-only permissions.
+Refreshes follow the Codex cadence and only query the OpenAI costs endpoint.
+
 ## OpenCode Go
 
 Settings → OpenCode Go. Paste the API key of your Go subscription (from the OpenCode console, the one OpenCode's

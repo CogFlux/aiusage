@@ -5,6 +5,7 @@ struct MenuContentView: View {
     @EnvironmentObject var store: UsageStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var codex: CodexStore
+    @EnvironmentObject var openAIAPICredits: OpenAIAPICreditsStore
     @EnvironmentObject var opencodeGo: OpenCodeGoStore
     @Environment(\.dismiss) private var dismiss
     /// An object rather than `@State`, which is a macro the Command Line Tools cannot expand.
@@ -14,7 +15,7 @@ struct MenuContentView: View {
 
     private var panelProviders: [Provider] {
         var enabled: Set<Provider> = store.enabled ? [.claude] : []
-        if codex.enabled { enabled.insert(.codex) }
+        if codex.enabled || openAIAPICredits.enabled { enabled.insert(.codex) }
         if deepseek.enabled { enabled.insert(.deepseek) }
         if opencodeGo.enabled { enabled.insert(.opencodego) }
         return store.layout.panel(enabled: enabled)
@@ -49,6 +50,7 @@ struct MenuContentView: View {
             store.menuOpened()
             deepseek.tick()
             codex.tick()
+            openAIAPICredits.tick()
             opencodeGo.tick()
             // Picks up a `claude` installed since the last look.
             if store.resolvedClaudePath == nil { store.refreshClaudePath() }
@@ -245,6 +247,7 @@ struct WindowRow: View {
     var repace: RepaceActions? = nil
     /// What to say when the provider reports no such window; Claude's text by default.
     var idleText: String? = nil
+    var resetLabel: ((_ date: String, _ countdown: String) -> String)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -252,8 +255,8 @@ struct WindowRow: View {
                 Text(strings.windowTitle(kind)).font(.headline)
                 Spacer()
                 if let window {
-                    Text(strings.resetsLine(clock(window.resetsAt),
-                                            UsageFormatter.countdown(to: window.resetsAt, from: now)))
+                    Text((resetLabel ?? strings.resetsLine)(clock(window.resetsAt),
+                                                            UsageFormatter.countdown(to: window.resetsAt, from: now)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
