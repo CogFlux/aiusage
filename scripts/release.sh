@@ -41,7 +41,7 @@ rm -rf "$APPCAST_WORK" && mkdir -p "$APPCAST_WORK" site
 cp "$ZIP" "$APPCAST_WORK/"
 "$SPARKLE_BIN/generate_appcast" \
   --download-url-prefix "https://github.com/CogFlux/aiusage/releases/download/$TAG/" \
-  --link "https://aiusage.cogflux.io" \
+  --link "https://aiusage.cogflux.net" \
   -o site/appcast.xml "$APPCAST_WORK"
 
 git tag -a "$TAG" -m "AIUsage $VERSION"

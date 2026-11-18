@@ -38,7 +38,7 @@ macOS 菜单栏里显示 Claude 订阅额度（5 小时 / 7 天窗口），可�
 ## 更新
 
 打包发布的版本通过 [Sparkle](https://sparkle-project.org) 检查更新（EdDSA 签名的 appcast 位于
-`aiusage.cogflux.io/appcast.xml`）。在 设置 → 通用 里可开关自动检查或手动检查。
+`aiusage.cogflux.net/appcast.xml`）。在 设置 → 通用 里可开关自动检查或手动检查。
 
 ## 设置
 
