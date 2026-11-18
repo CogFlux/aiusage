@@ -74,7 +74,7 @@ struct CodexSection: View {
             if codex.isRefreshing {
                 ProgressView().controlSize(.small)
             } else if let observed = codex.usage?.observedAt {
-                Text(age(observed)).font(.caption)
+                Text(store.readingAge(observed, relativeTo: codex.now)).font(.caption)
                     .foregroundStyle(codex.isStale ? .orange : .secondary)
             } else {
                 Text(s.waitingForData).font(.caption).foregroundStyle(.secondary)
@@ -100,13 +100,5 @@ struct CodexSection: View {
                 NSWorkspace.shared.open(CodexStore.installURL)
             }
         }
-    }
-
-    private func age(_ date: Date) -> String {
-        if codex.now.timeIntervalSince(date) < 60 { return s.justNow }
-        let f = RelativeDateTimeFormatter()
-        f.locale = store.locale
-        f.unitsStyle = .short
-        return f.localizedString(for: date, relativeTo: codex.now)
     }
 }

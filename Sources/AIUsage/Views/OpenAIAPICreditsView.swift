@@ -61,6 +61,12 @@ struct OpenAIAPICreditsRow: View {
                 Spacer()
                 if credits.isRefreshing {
                     ProgressView().controlSize(.small)
+                } else if let updatedAt = credits.updatedAt {
+                    let timestamp = updatedAt.formatted(.dateTime.month(.abbreviated).day().hour().minute().locale(store.locale))
+                    Text(store.readingAge(updatedAt, relativeTo: credits.now))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help(s.openAIAPIUpdated(timestamp))
                 }
                 Button(action: credits.refresh) {
                     Image(systemName: "arrow.clockwise")
@@ -84,10 +90,6 @@ struct OpenAIAPICreditsRow: View {
                           repace: .init(available: credits.canRepace, automatic: false,
                                         start: credits.repaceFromNow, clear: credits.clearCheckpoint),
                           resetLabel: credits.isRenewalEstimated ? s.openAIAPIEstimatedReset : nil)
-                if let updatedAt = credits.updatedAt, credits.issue != nil {
-                    Text(s.openAIAPIUpdated(updatedAt.formatted(.dateTime.hour().minute().locale(store.locale))))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
             }
             if let issue = credits.issue {
                 Text(s.openAIAPIIssue(issue)).font(.caption).foregroundStyle(.red)

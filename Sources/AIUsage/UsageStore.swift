@@ -448,11 +448,15 @@ final class UsageStore: ObservableObject {
     /// Relative age of the last confirmed reading in the selected language, e.g. "3 minutes ago".
     var snapshotAge: String? {
         guard snapshot != nil, let confirmed else { return nil }
-        if now.timeIntervalSince(confirmed.at) < 60 { return strings.justNow }
+        return readingAge(confirmed.at, relativeTo: now)
+    }
+
+    func readingAge(_ date: Date, relativeTo now: Date) -> String {
+        if now.timeIntervalSince(date) < 60 { return strings.justNow }
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = locale
         formatter.unitsStyle = .short
-        return formatter.localizedString(for: confirmed.at, relativeTo: now)
+        return formatter.localizedString(for: date, relativeTo: now)
     }
 
     /// See `MergePolicy` for the rule; the tracker says whether `incoming` is a live reading.
