@@ -45,8 +45,9 @@ switch to the new line. It expires when the window resets; *Clear* removes it ea
 
 ## Updates
 
-Packaged releases check for updates through [Sparkle](https://sparkle-project.org) (EdDSA-signed appcast at
-`aiusage.cogflux.io/appcast.xml`). Toggle automatic checks or check manually in Settings → General.
+Packaged releases check for updates through [Sparkle](https://sparkle-project.org) using a
+[signed update feed on GitHub Releases](https://github.com/CogFlux/aiusage/releases/latest/download/appcast.xml).
+Toggle automatic checks or check manually in Settings → General.
 
 ## Settings
 

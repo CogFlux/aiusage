@@ -10,7 +10,7 @@ VERSION="${VERSION:-0.1.0}"
 BUNDLE_ID="${BUNDLE_ID:-io.cogflux.aiusage}"
 # Sparkle: feed URL and the EdDSA public key (sparkle-public-key.txt, committed; the private
 # key stays in the release maintainer's Keychain). Without the key file the updater is off.
-SU_FEED_URL="${SU_FEED_URL:-https://aiusage.cogflux.io/appcast.xml}"
+SU_FEED_URL="${SU_FEED_URL:-https://github.com/CogFlux/aiusage/releases/latest/download/appcast.xml}"
 SU_PUBLIC_KEY="${SU_PUBLIC_KEY:-$(cat sparkle-public-key.txt 2>/dev/null || true)}"
 SPARKLE_FRAMEWORK=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
 
