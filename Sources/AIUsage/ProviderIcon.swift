@@ -36,6 +36,7 @@ extension Provider {
         case .codex: return "Codex"
         case .deepseek: return "DeepSeek"
         case .opencodego: return "OpenCode Go"
+        case .googleAI: return "Google AI"
         }
     }
 }

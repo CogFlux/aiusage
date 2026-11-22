@@ -5,6 +5,7 @@ public enum Provider: String, Codable, CaseIterable, Hashable, Sendable {
     case codex
     case deepseek
     case opencodego
+    case googleAI = "googleai"
 }
 
 /// Which providers the popover and the menu bar show, and in what order. One order serves both,

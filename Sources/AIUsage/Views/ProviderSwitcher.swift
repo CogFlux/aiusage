@@ -10,6 +10,8 @@ struct ProviderSwitcher: View {
     @EnvironmentObject var codex: CodexStore
     @EnvironmentObject var deepseek: DeepSeekStore
     @EnvironmentObject var opencodeGo: OpenCodeGoStore
+    @EnvironmentObject var antigravity: AntigravityStore
+    @EnvironmentObject var geminiApp: GeminiAppStore
 
     var body: some View {
         HStack(alignment: .top, spacing: 4) {
@@ -52,6 +54,7 @@ struct ProviderSwitcher: View {
         case .codex:
             if codex.enabled { bars(codex.displayedWindowKinds.map { codex.pace(for: $0) }) }
         case .opencodego: bars(OpenCodeGoStore.kinds.map { opencodeGo.pace(for: $0) })
+        case .googleAI: bars(googleAIPaces)
         case .deepseek:
             if let pace = deepseek.budgetPace {
                 bars([pace])
@@ -59,6 +62,19 @@ struct ProviderSwitcher: View {
                 Text(deepseek.money(latest.total, compact: true))
                     .font(.caption2.monospacedDigit())
                     .lineLimit(1)
+            }
+        }
+    }
+
+    private var googleAIPaces: [Pace?] {
+        WindowKind.claudeKinds.map { kind in
+            let ag = antigravity.enabled ? antigravity.representativePace(for: kind) : nil
+            let gm = geminiApp.enabled ? geminiApp.pace(for: kind) : nil
+            switch (ag, gm) {
+            case let (a?, b?): return b.usedPercent > a.usedPercent ? b : a
+            case let (a?, nil): return a
+            case let (nil, b?): return b
+            case (nil, nil): return nil
             }
         }
     }

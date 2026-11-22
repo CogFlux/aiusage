@@ -34,14 +34,23 @@ public struct UsageAlert: Equatable, Sendable {
         provider == "claude" ? rateLimitWindow : nil
     }
 
-    /// "claude", "codex", "deepseek": the part of `windowID` before the dot.
+    /// "claude", "codex", "deepseek", "antigravity", "gemini": the part of `windowID` before the dot.
     public var provider: String {
         String(windowID.prefix { $0 != "." })
     }
 
-    /// The 5-hour or 7-day window this alert is about, whichever provider it belongs to.
+    /// Optional sub-group between provider and window kind, e.g. "gemini" in "antigravity.gemini.five_hour".
+    public var groupID: String? {
+        let parts = windowID.split(separator: ".")
+        guard parts.count >= 3 else { return nil }
+        return parts[1..<(parts.count - 1)].joined(separator: ".")
+    }
+
+    /// The rate-limit window this alert is about, whichever provider (or sub-group) it belongs to.
     public var rateLimitWindow: WindowKind? {
-        WindowKind(rawValue: String(windowID.dropFirst(provider.count + 1)))
+        let parts = windowID.split(separator: ".")
+        guard parts.count >= 2, let tail = parts.last else { return nil }
+        return WindowKind(rawValue: String(tail))
     }
 }
 

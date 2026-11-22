@@ -5,13 +5,14 @@ import SwiftUI
 /// `SettingsPresenter` builds, the way macOS settings windows look.
 struct SettingsView: View {
     enum Tab: CaseIterable {
-        case general, claudeCode, codex, opencodeGo, deepseek, sync
+        case general, claudeCode, codex, googleAI, opencodeGo, deepseek, sync
 
         func title(_ s: Strings) -> String {
             switch self {
             case .general: return s.general
             case .claudeCode: return s.claudeCode
             case .codex: return "Codex"
+            case .googleAI: return "Google AI"
             case .opencodeGo: return "OpenCode Go"
             case .deepseek: return "DeepSeek"
             case .sync: return s.syncTab
@@ -23,6 +24,7 @@ struct SettingsView: View {
             switch self {
             case .claudeCode: return .claude
             case .codex: return .codex
+            case .googleAI: return .googleAI
             case .opencodeGo: return .opencodego
             case .deepseek: return .deepseek
             case .general, .sync: return nil
@@ -34,6 +36,7 @@ struct SettingsView: View {
             case .general: return "gearshape"
             case .claudeCode: return "terminal"
             case .codex: return "chevron.left.forwardslash.chevron.right"
+            case .googleAI: return "sparkles"
             case .opencodeGo: return "curlybraces"
             case .deepseek: return "creditcard"
             case .sync: return "arrow.up.circle"
@@ -49,6 +52,8 @@ struct SettingsView: View {
     @EnvironmentObject var codex: CodexStore
     @EnvironmentObject var openAIAPICredits: OpenAIAPICreditsStore
     @EnvironmentObject var opencodeGo: OpenCodeGoStore
+    @EnvironmentObject var antigravity: AntigravityStore
+    @EnvironmentObject var geminiApp: GeminiAppStore
     @EnvironmentObject var updater: Updater
     @EnvironmentObject var sync: SyncStore
 
@@ -60,6 +65,7 @@ struct SettingsView: View {
             case .general: generalTab
             case .claudeCode: claudeCodeTab
             case .codex: codexTab
+            case .googleAI: googleAITab
             case .opencodeGo: opencodeGoTab
             case .deepseek: deepseekTab
             case .sync: syncTab
@@ -83,7 +89,7 @@ struct SettingsView: View {
             layoutSection
 
             // The 5h/7d choice only matters while the menu bar shows a provider with those windows.
-            if !Set(store.layout.menuBar(enabled: enabledProviders)).isDisjoint(with: [.claude, .codex, .opencodego]) {
+            if !Set(store.layout.menuBar(enabled: enabledProviders)).isDisjoint(with: [.claude, .codex, .opencodego, .googleAI]) {
                 Picker(s.menuBarShows, selection: $store.menuBarKind) {
                     ForEach(WindowKind.claudeKinds, id: \.self) { kind in
                         Text(kind.shortLabel).tag(kind)
@@ -155,6 +161,7 @@ struct SettingsView: View {
         if codex.enabled || openAIAPICredits.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
         if opencodeGo.enabled { set.insert(.opencodego) }
+        if antigravity.enabled || geminiApp.enabled { set.insert(.googleAI) }
         return set
     }
 
@@ -218,6 +225,7 @@ struct SettingsView: View {
         case .codex: return .codex
         case .deepseek: return .deepseek
         case .opencodego: return .opencodeGo
+        case .googleAI: return .googleAI
         }
     }
 
@@ -270,6 +278,114 @@ struct SettingsView: View {
             s.codexPaidThrough($0.formatted(Date.FormatStyle.dateTime.month(.abbreviated).day().locale(store.locale)))
         }
         return ([codex.planLabel].compactMap { $0 } + windows + [until].compactMap { $0 }).joined(separator: " · ")
+    }
+
+    // MARK: Google AI
+
+    private var googleAITab: some View {
+        Form {
+            Section {
+                Toggle(isOn: $antigravity.enabled) {
+                    Text(s.antigravityEnable)
+                    Text(s.antigravityEnableHint)
+                }
+                if antigravity.enabled {
+                    TextField(s.antigravityAgyPath, text: $antigravity.agyPathOverride,
+                              prompt: Text(antigravity.resolvedAgyPath ?? s.antigravityAgyPathPlaceholder))
+                        .font(.callout.monospaced())
+                    HStack(alignment: .top) {
+                        if let error = antigravity.lastError {
+                            Text(error).font(.caption)
+                                .foregroundStyle(antigravity.errorIsMinor ? Color.secondary : .red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if let summary = antigravitySummary {
+                            Text(summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if antigravity.isRefreshing {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button(s.codexRefresh) { antigravity.refresh() }
+                            .disabled(antigravity.isRefreshing)
+                    }
+                }
+            } header: {
+                Text("Antigravity")
+            }
+
+            Section {
+                Toggle(isOn: $geminiApp.enabled) {
+                    Text(s.geminiAppEnable)
+                    Text(s.geminiAppEnableHint)
+                }
+                if geminiApp.enabled {
+                    HStack {
+                        SecureField(s.geminiAppCookieLabel, text: $geminiApp.cookieDraft,
+                                    prompt: Text(geminiApp.hasCookie ? "••••••••" : "__Secure-1PSID=…"))
+                            .onSubmit(geminiApp.saveTypedCookie)
+                        Button(s.deepseekSave, action: geminiApp.saveTypedCookie)
+                            .disabled(geminiApp.cookieDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        if geminiApp.hasCookie {
+                            Button(s.geminiAppCookieRemove, action: geminiApp.removeCookie)
+                        }
+                    }
+                    if let error = geminiApp.cookieError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(geminiApp.cookieJustSaved ? s.geminiAppCookieSaved : s.geminiAppCookieHint)
+                            .font(.caption).foregroundStyle(geminiApp.cookieJustSaved ? .green : .secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack {
+                        Link(s.geminiAppOpenUsagePage, destination: GeminiAppClient.usagePageURL)
+                        Spacer()
+                    }
+                    HStack(alignment: .top) {
+                        if let error = geminiApp.lastError {
+                            Text(error).font(.caption)
+                                .foregroundStyle(geminiApp.errorIsMinor ? Color.secondary : .red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else if let summary = geminiAppSummary {
+                            Text(summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if geminiApp.isRefreshing {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button(s.codexRefresh) { geminiApp.refresh() }
+                            .disabled(!geminiApp.canRefresh || geminiApp.isRefreshing)
+                    }
+                }
+            } header: {
+                Text(s.geminiAppSectionTitle)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var antigravitySummary: String? {
+        guard let usage = antigravity.usage else { return nil }
+        let parts: [String] = usage.groups.compactMap { group in
+            if !group.windows.isEmpty {
+                let ws = group.windows.map { "\($0.kind.shortLabel) \(UsageFormatter.percent($0.usedPercent))" }
+                    .joined(separator: " ")
+                return "\(group.title) \(ws)"
+            }
+            if let fb = group.fallbackUsedPercent {
+                return "\(group.title) \(UsageFormatter.percent(fb))"
+            }
+            return nil
+        }
+        let prefix = [usage.planName].compactMap { $0 }
+        let all = prefix + parts
+        return all.isEmpty ? nil : all.joined(separator: " · ")
+    }
+
+    private var geminiAppSummary: String? {
+        guard let usage = geminiApp.usage else { return nil }
+        let windows = usage.windows.map { "\($0.kind.shortLabel) \(UsageFormatter.percent($0.usedPercent))" }
+        return ([usage.planLabel].compactMap { $0 } + windows).joined(separator: " · ")
     }
 
     // MARK: OpenCode Go

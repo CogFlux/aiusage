@@ -7,6 +7,8 @@ struct MenuContentView: View {
     @EnvironmentObject var codex: CodexStore
     @EnvironmentObject var openAIAPICredits: OpenAIAPICreditsStore
     @EnvironmentObject var opencodeGo: OpenCodeGoStore
+    @EnvironmentObject var antigravity: AntigravityStore
+    @EnvironmentObject var geminiApp: GeminiAppStore
     @Environment(\.dismiss) private var dismiss
     /// An object rather than `@State`, which is a macro the Command Line Tools cannot expand.
     @StateObject private var providerBlocksHeight = MeasuredHeight()
@@ -18,6 +20,7 @@ struct MenuContentView: View {
         if codex.enabled || openAIAPICredits.enabled { enabled.insert(.codex) }
         if deepseek.enabled { enabled.insert(.deepseek) }
         if opencodeGo.enabled { enabled.insert(.opencodego) }
+        if antigravity.enabled || geminiApp.enabled { enabled.insert(.googleAI) }
         return store.layout.panel(enabled: enabled)
     }
 
@@ -52,6 +55,8 @@ struct MenuContentView: View {
             codex.tick()
             openAIAPICredits.tick()
             opencodeGo.tick()
+            antigravity.tick()
+            geminiApp.tick()
             // Picks up a `claude` installed since the last look.
             if store.resolvedClaudePath == nil { store.refreshClaudePath() }
         }
@@ -74,6 +79,7 @@ struct MenuContentView: View {
             case .codex: CodexSection()
             case .deepseek: DeepSeekSection()
             case .opencodego: OpenCodeGoSection()
+            case .googleAI: GoogleAISection()
             }
         }
     }

@@ -114,7 +114,7 @@ enum CodexChecks {
 
     static func layoutKeepsEveryProviderOnce() {
         let layout = ProviderLayout(order: [.deepseek, .deepseek, .claude])
-        Harness.equal(layout.order, [.deepseek, .claude, .codex, .opencodego], "deduped, missing appended")
+        Harness.equal(layout.order, [.deepseek, .claude, .codex, .opencodego, .googleAI], "deduped, missing appended")
         Harness.equal(ProviderLayout().order, Provider.allCases, "default order")
     }
 
@@ -133,17 +133,17 @@ enum CodexChecks {
     static func layoutMovesWithinBounds() {
         var layout = ProviderLayout()
         layout.move(.deepseek, by: -1)
-        Harness.equal(layout.order, [.claude, .deepseek, .codex, .opencodego], "moved up")
+        Harness.equal(layout.order, [.claude, .deepseek, .codex, .opencodego, .googleAI], "moved up")
         layout.move(.claude, by: -1)
-        Harness.equal(layout.order, [.claude, .deepseek, .codex, .opencodego], "top stays")
-        layout.move(.claude, by: 5)
-        Harness.equal(layout.order, [.deepseek, .codex, .opencodego, .claude], "clamped to the bottom")
+        Harness.equal(layout.order, [.claude, .deepseek, .codex, .opencodego, .googleAI], "top stays")
+        layout.move(.claude, by: 10)
+        Harness.equal(layout.order, [.deepseek, .codex, .opencodego, .googleAI, .claude], "clamped to the bottom")
     }
 
     static func layoutSurvivesUnknownProviders() {
         let json = #"{"order":["deepseek","cursor","claude"],"hiddenInPanel":["cursor"],"inMenuBar":["deepseek"]}"#
         let layout = try? JSONDecoder().decode(ProviderLayout.self, from: Data(json.utf8))
-        Harness.equal(layout?.order, [.deepseek, .claude, .codex, .opencodego], "unknown dropped, missing appended")
+        Harness.equal(layout?.order, [.deepseek, .claude, .codex, .opencodego, .googleAI], "unknown dropped, missing appended")
         Harness.equal(layout?.inMenuBar, [.deepseek], "menu bar kept")
         let roundTrip = (try? JSONEncoder().encode(layout)).flatMap { try? JSONDecoder().decode(ProviderLayout.self, from: $0) }
         Harness.equal(roundTrip, layout, "round trip")

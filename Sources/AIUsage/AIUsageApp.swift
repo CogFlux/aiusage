@@ -8,6 +8,8 @@ struct AIUsageApp: App {
     @StateObject private var codex: CodexStore
     @StateObject private var openAIAPICredits: OpenAIAPICreditsStore
     @StateObject private var opencodeGo: OpenCodeGoStore
+    @StateObject private var antigravity: AntigravityStore
+    @StateObject private var geminiApp: GeminiAppStore
     @StateObject private var updater: Updater
     @StateObject private var sync: SyncStore
 
@@ -20,6 +22,10 @@ struct AIUsageApp: App {
         // Same for Codex: `AIUsage --codex-probe` reads its quota once (free) and prints it.
         if CommandLine.arguments.contains("--codex-probe") {
             Self.runCodexProbeAndExit()
+        }
+        // Same for Google AI (Antigravity): `AIUsage --google-probe` reads local Antigravity quota once (free).
+        if CommandLine.arguments.contains("--google-probe") {
+            Self.runGoogleProbeAndExit()
         }
         // No Dock icon. The .app also sets LSUIElement, but this makes the bare
         // `swift run` binary behave the same way.
@@ -36,6 +42,10 @@ struct AIUsageApp: App {
         _openAIAPICredits = StateObject(wrappedValue: openAIAPICredits)
         let opencodeGo = OpenCodeGoStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
         _opencodeGo = StateObject(wrappedValue: opencodeGo)
+        let antigravity = AntigravityStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
+        _antigravity = StateObject(wrappedValue: antigravity)
+        let geminiApp = GeminiAppStore(notifier: notifier, strings: { store.strings }, locale: { store.locale })
+        _geminiApp = StateObject(wrappedValue: geminiApp)
         let updater = Updater()
         _updater = StateObject(wrappedValue: updater)
         let sync = SyncStore(store: store, codex: codex)
@@ -47,6 +57,8 @@ struct AIUsageApp: App {
                 .environmentObject(codex)
                 .environmentObject(openAIAPICredits)
                 .environmentObject(opencodeGo)
+                .environmentObject(antigravity)
+                .environmentObject(geminiApp)
                 .environmentObject(updater)
                 .environmentObject(sync)
         }
@@ -65,8 +77,30 @@ struct AIUsageApp: App {
                 return deepseek.menuBarTitle(compact: store.compactMenuBar)
             case .opencodego:
                 return opencodeGo.menuBarTitle(kind: store.menuBarKind, compact: store.compactMenuBar)
+            case .googleAI:
+                return googleAIMenuBarTitle
             }
         })
+    }
+
+    private var googleAIMenuBarTitle: String {
+        let kind = store.menuBarKind
+        let compact = store.compactMenuBar
+        if antigravity.enabled && geminiApp.enabled {
+            let agPace = antigravity.representativePace(for: kind)
+            let gmPace = geminiApp.pace(for: kind)
+            if let agPace, let gmPace {
+                return gmPace.usedPercent > agPace.usedPercent
+                    ? geminiApp.menuBarTitle(kind: kind, compact: compact)
+                    : antigravity.menuBarTitle(kind: kind, compact: compact)
+            }
+            if gmPace != nil && agPace == nil {
+                return geminiApp.menuBarTitle(kind: kind, compact: compact)
+            }
+            return antigravity.menuBarTitle(kind: kind, compact: compact)
+        }
+        if antigravity.enabled { return antigravity.menuBarTitle(kind: kind, compact: compact) }
+        return geminiApp.menuBarTitle(kind: kind, compact: compact)
     }
 
     private var enabledProviders: Set<Provider> {
@@ -74,6 +108,7 @@ struct AIUsageApp: App {
         if codex.enabled || openAIAPICredits.enabled { set.insert(.codex) }
         if deepseek.enabled { set.insert(.deepseek) }
         if opencodeGo.enabled { set.insert(.opencodego) }
+        if antigravity.enabled || geminiApp.enabled { set.insert(.googleAI) }
         return set
     }
 
@@ -140,6 +175,34 @@ struct AIUsageApp: App {
         exit(exitCode)
     }
 
+    private static func runGoogleProbeAndExit() -> Never {
+        let override = UserDefaults.standard.string(forKey: "antigravityAgyPath") ?? ""
+        let agyPath = AntigravityProbe.resolveAgyPath(override: override)
+        let done = DispatchSemaphore(value: 0)
+        var exitCode: Int32 = 0
+        Task.detached {
+            defer { done.signal() }
+            do {
+                let usage = try await AntigravityProbe.fetch(agyPath: agyPath)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                encoder.dateEncodingStrategy = .iso8601
+                print(String(decoding: try encoder.encode(usage), as: UTF8.self))
+                for group in usage.groups {
+                    for window in group.windows {
+                        let pace = PaceCalculator.compute(window: window, now: Date())
+                        print("AG", group.title, UsageFormatter.menuBarTitle(kind: window.kind, pace: pace, stale: false))
+                    }
+                }
+            } catch {
+                FileHandle.standardError.write(Data("google probe failed: \(error.localizedDescription)\n".utf8))
+                exitCode = 1
+            }
+        }
+        done.wait()
+        exit(exitCode)
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuContentView()
@@ -148,6 +211,8 @@ struct AIUsageApp: App {
                 .environmentObject(codex)
                 .environmentObject(openAIAPICredits)
                 .environmentObject(opencodeGo)
+                .environmentObject(antigravity)
+                .environmentObject(geminiApp)
                 .environmentObject(updater)
         } label: {
             // With every provider off there is nothing to show, but the item must stay clickable.

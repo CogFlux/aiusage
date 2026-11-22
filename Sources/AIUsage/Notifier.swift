@@ -74,6 +74,19 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         if alert.provider == OpenCodeGoStore.provider, let kind = alert.rateLimitWindow {
             return strings.opencodeGoWindowTitle(kind)
         }
+        if alert.provider == AntigravityStore.provider, let kind = alert.rateLimitWindow {
+            let groupName: String? = alert.groupID.map { id in
+                switch id {
+                case "gemini": return "Gemini"
+                case "claude-gpt": return "Claude / GPT"
+                default: return id
+                }
+            }
+            return strings.antigravityWindowTitle(group: groupName, kind: kind)
+        }
+        if alert.provider == GeminiAppStore.provider, let kind = alert.rateLimitWindow {
+            return strings.geminiAppWindowTitle(kind)
+        }
         if alert.windowID == DeepSeekStore.windowID { return strings.deepseekBudgetTitle }
         return alert.windowID
     }

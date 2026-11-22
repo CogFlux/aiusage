@@ -290,6 +290,37 @@ the web console only) and costs nothing:
 - Not used: the console's cookie-authenticated JSON (`/console/api/go/status`) and server functions, which need a
   browser session, and OpenCode's local cost history, which covers one device only and estimates the limits.
 
+### 1.9 Google AI (Antigravity + Gemini app)
+
+A Google AI Pro or Ultra subscription covers two separate machine-readable quota systems, grouped under one
+`googleai` tab (the same layout as Codex + OpenAI API credits):
+
+1. **Antigravity** (developer quota: Antigravity 2.0 desktop app, `agy` CLI, and Antigravity IDE — Google retired
+   consumer Gemini CLI OAuth in June 2026 in favor of Antigravity). Free: no model requests and no credentials stored.
+   Sources tried in order:
+   - **Running Antigravity 2.0 / Gemini.app local language server**: discovered via Darwin `libproc`/`sysctl`
+     (`--csrf_token`, `--extension_server_port`, `--extension_server_csrf_token`, listening TCP ports). Calls
+     `POST https://127.0.0.1:<port>/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary`
+     (`{"forceRefresh":true}`, `Connect-Protocol-Version: 1`, `X-Codeium-Csrf-Token`, self-signed TLS accepted for
+     loopback only, HTTP redirects rejected), plus a best-effort `GetUserStatus` for plan name, email and available AI credits. Falls back to
+     `GetUserStatus` and `GetCommandModelConfigs`.
+   - **`agy` CLI fallback**: `agy -p /usage --output-format json` in a private temporary directory with
+     `AGY_CLI_DISABLE_AUTO_UPDATE=true` and a failing `open` shim so a signed-out CLI cannot open a browser window.
+   - **Running Antigravity IDE extension local language server**: same loopback Connect-RPC probe.
+
+   Structured quota summaries report per-family pools (`Gemini`, `Claude / GPT`, and any versioned Gemini pool such as
+   `Gemini 4 Argon`) with `5h` (`.fiveHour`) and `weekly` (`.sevenDay`) buckets (`usedPercent = (1 - remainingFraction) * 100`).
+   Each group window is paced and alerted (`antigravity.<group>.<kind>`) like Claude's; the menu bar and chart follow
+   the most constrained group for each cadence. Legacy `GetUserStatus` payloads without an explicit cadence show a plain
+   usage bar without inventing a 5-hour duration.
+
+2. **Gemini app (`gemini.google.com/usage`, opt-in, off by default)**: reads the separate 5-hour (`GXU_FIVE_HOURLY`)
+   and weekly (`GXU_WEEKLY`) limits via the persisted `UsagePageQuery` GraphQL endpoint CodexBar's `gemini-web` plugin
+   uses, authenticated strictly with a Cookie header the user pastes in Settings → Google AI (saved in
+   `~/Library/Application Support/AIUsage/gemini-app.cookie` with mode `0600` before writing the credential). The
+   client rejects HTTP redirects. A failed removal pauses polling until the Cookie is removed or replaced. The app
+   reads the manually supplied Cookie from its own file.
+
 ## 2. Unified model
 
 ```

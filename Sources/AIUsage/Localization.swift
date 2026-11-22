@@ -203,6 +203,43 @@ struct Strings {
     let opencodeGoNetworkError: String
     let opencodeGoWindowIdle: String
 
+    // Google AI (Antigravity + Gemini app)
+    let antigravityEnable: String
+    let antigravityEnableHint: String
+    let antigravityAgyPath: String
+    let antigravityAgyPathPlaceholder: String
+    let antigravityNotRunning: String
+    let antigravityMissingToken: String
+    let antigravityNoPort: String
+    let antigravityAPIError: (_ message: String) -> String
+    let antigravityMalformed: String
+    let antigravityCLITimeout: String
+    let antigravityCLIFailed: (_ message: String) -> String
+    let antigravitySourceApp: String
+    let antigravitySourceCLI: String
+    let antigravitySourceIDE: String
+    let antigravityCreditsLine: (_ prompt: String, _ flow: String?) -> String
+    let geminiAppSectionTitle: String
+    let geminiAppEnable: String
+    let geminiAppEnableHint: String
+    let geminiAppCookieLabel: String
+    let geminiAppCookieHint: String
+    let geminiAppCookieSaved: String
+    let geminiAppCookieInvalid: String
+    let geminiAppCookieSaveFailed: String
+    let geminiAppCookieReadFailed: String
+    let geminiAppCookieRemove: String
+    let geminiAppCookieRemoveFailed: String
+    let geminiAppOpenUsagePage: String
+    let geminiAppNoCookie: String
+    let geminiAppUnauthorized: String
+    let geminiAppRateLimited: String
+    let geminiAppServerError: (_ status: Int) -> String
+    let geminiAppMalformed: String
+    let geminiAppNoWindows: String
+    let geminiAppNetworkError: String
+    let geminiAppWindowIdle: String
+
     // Usage chart
     let chartToggle: String
     let chartEmpty: String
@@ -319,6 +356,17 @@ struct Strings {
 
     func opencodeGoWindowTitle(_ kind: AIUsageCore.WindowKind) -> String {
         "OpenCode Go " + windowTitle(kind)
+    }
+
+    func antigravityWindowTitle(group: String?, kind: AIUsageCore.WindowKind) -> String {
+        if let group, !group.isEmpty {
+            return "Antigravity \(group) " + windowTitle(kind)
+        }
+        return "Antigravity " + windowTitle(kind)
+    }
+
+    func geminiAppWindowTitle(_ kind: AIUsageCore.WindowKind) -> String {
+        "Gemini " + windowTitle(kind)
     }
 
     static let en = Strings(
@@ -465,6 +513,45 @@ struct Strings {
         opencodeGoMalformed: "OpenCode's answer had no quota in it. The endpoint may have changed, or the key has no Go subscription.",
         opencodeGoNetworkError: "Could not reach opencode.ai (network error). It will try again at the next refresh.",
         opencodeGoWindowIdle: "OpenCode Go reported no such window.",
+
+        antigravityEnable: "Track Antigravity quota",
+        antigravityEnableHint: "Reads your Antigravity 5-hour and weekly limits (Gemini and Claude / GPT pools) from the running Antigravity app's local language server, falling back to the agy CLI (agy -p /usage --output-format json) or Antigravity IDE. Free: no model requests.",
+        antigravityAgyPath: "agy path",
+        antigravityAgyPathPlaceholder: "Auto-detect (optional fallback when Antigravity app is closed)",
+        antigravityNotRunning: "Antigravity is not running and agy CLI was not found. Open Antigravity, or install agy and sign in.",
+        antigravityMissingToken: "Antigravity language server is running without a CSRF token. Restart Antigravity and retry.",
+        antigravityNoPort: "Antigravity is starting up and has no listening port yet. Try again in a moment.",
+        antigravityAPIError: { "Antigravity local server error: \($0)" },
+        antigravityMalformed: "Antigravity returned no usable quota data.",
+        antigravityCLITimeout: "agy -p /usage timed out. Check your sign-in in a terminal and retry.",
+        antigravityCLIFailed: { "agy -p /usage failed: \($0)" },
+        antigravitySourceApp: "app",
+        antigravitySourceCLI: "agy",
+        antigravitySourceIDE: "IDE",
+        antigravityCreditsLine: { prompt, flow in
+            if let flow { return "AI credits · Prompt \(prompt) · Flow \(flow)" }
+            return "AI credits · \(prompt)"
+        },
+        geminiAppSectionTitle: "Gemini app (gemini.google.com)",
+        geminiAppEnable: "Track Gemini app quota",
+        geminiAppEnableHint: "Opt-in: reads the separate 5-hour and weekly limits shown at gemini.google.com/usage using a Cookie header you paste below (the same GraphQL query CodexBar reads). Off by default; never reads browser databases or Keychain automatically.",
+        geminiAppCookieLabel: "Cookie header",
+        geminiAppCookieHint: "Copy the Cookie request header from DevTools on gemini.google.com/usage. Stored in ~/Library/Application Support/AIUsage/gemini-app.cookie (owner-only permissions) and sent only to gemini.google.com.",
+        geminiAppCookieSaved: "Cookie saved.",
+        geminiAppCookieInvalid: "Paste a single Cookie request header from gemini.google.com/usage.",
+        geminiAppCookieSaveFailed: "Could not save the Gemini Cookie. Check the AIUsage folder permissions and try again.",
+        geminiAppCookieReadFailed: "Could not read the saved Gemini Cookie. Try saving it again.",
+        geminiAppCookieRemove: "Remove Cookie",
+        geminiAppCookieRemoveFailed: "Could not remove the saved Cookie. Gemini quota checks are paused. Try removing it again.",
+        geminiAppOpenUsagePage: "Open gemini.google.com/usage",
+        geminiAppNoCookie: "Paste your gemini.google.com Cookie header in Settings → Google AI.",
+        geminiAppUnauthorized: "Gemini rejected the cookie or your session expired. Copy a fresh Cookie header from gemini.google.com/usage in Settings → Google AI.",
+        geminiAppRateLimited: "Gemini rate-limited the usage request. It will try again at the next refresh.",
+        geminiAppServerError: { "Gemini answered HTTP \($0). It will try again at the next refresh." },
+        geminiAppMalformed: "Gemini's usage response format changed or had no quota data.",
+        geminiAppNoWindows: "This Google account reported no Gemini app 5-hour or weekly quota windows.",
+        geminiAppNetworkError: "Could not reach gemini.google.com (network error). It will try again at the next refresh.",
+        geminiAppWindowIdle: "Gemini app reported no such window.",
 
         chartToggle: "Usage over time",
         chartEmpty: "No readings recorded for this window yet. AIUsage keeps the history from now on.",
@@ -690,6 +777,45 @@ struct Strings {
         opencodeGoMalformed: "OpenCode 的返回里没有额度数据。可能接口变了，或者这个 key 没有 Go 订阅。",
         opencodeGoNetworkError: "无法连接 opencode.ai（网络错误），下次刷新时会再试。",
         opencodeGoWindowIdle: "OpenCode Go 没有报告这个窗口。",
+
+        antigravityEnable: "跟踪 Antigravity 额度",
+        antigravityEnableHint: "从正在运行的 Antigravity 桌面端本地语言服务读取 5 小时和每周额度（Gemini 与 Claude / GPT 模型池），桌面端关闭时回退到 agy CLI（agy -p /usage --output-format json）或 Antigravity IDE。免费：不发送模型请求。",
+        antigravityAgyPath: "agy 路径",
+        antigravityAgyPathPlaceholder: "自动查找（可选，桌面端关闭时回退）",
+        antigravityNotRunning: "未检测到运行中的 Antigravity，也未找到 agy CLI。请打开 Antigravity，或安装并登录 agy。",
+        antigravityMissingToken: "检测到 Antigravity 本地服务但缺少 CSRF token，请重启 Antigravity 后重试。",
+        antigravityNoPort: "Antigravity 正在启动，尚未监听本地端口，请稍后重试。",
+        antigravityAPIError: { "Antigravity 本地服务返回错误：\($0)" },
+        antigravityMalformed: "Antigravity 返回的数据中没有可用额度。",
+        antigravityCLITimeout: "agy -p /usage 超时。请在终端检查登录状态后重试。",
+        antigravityCLIFailed: { "agy -p /usage 失败：\($0)" },
+        antigravitySourceApp: "桌面端",
+        antigravitySourceCLI: "agy",
+        antigravitySourceIDE: "IDE",
+        antigravityCreditsLine: { prompt, flow in
+            if let flow { return "AI Credits · Prompt \(prompt) · Flow \(flow)" }
+            return "AI Credits · \(prompt)"
+        },
+        geminiAppSectionTitle: "Gemini 网页/应用（gemini.google.com）",
+        geminiAppEnable: "跟踪 Gemini 应用额度",
+        geminiAppEnableHint: "可选：使用下方手动粘贴的 Cookie 读取 gemini.google.com/usage 上独立的 5 小时和每周额度（与 CodexBar 相同的接口）。默认关闭；绝不自动读取浏览器数据库或钥匙串。",
+        geminiAppCookieLabel: "Cookie 请求头",
+        geminiAppCookieHint: "在 gemini.google.com/usage 的开发者工具里复制请求头中的 Cookie。保存在 ~/Library/Application Support/AIUsage/gemini-app.cookie（仅本人可读），只会发送给 gemini.google.com。",
+        geminiAppCookieSaved: "Cookie 已保存。",
+        geminiAppCookieInvalid: "请从 gemini.google.com/usage 粘贴单行 Cookie 请求头。",
+        geminiAppCookieSaveFailed: "无法保存 Gemini Cookie。请检查 AIUsage 文件夹权限后重试。",
+        geminiAppCookieReadFailed: "无法读取已保存的 Gemini Cookie。请重新保存。",
+        geminiAppCookieRemove: "移除 Cookie",
+        geminiAppCookieRemoveFailed: "无法移除已保存的 Cookie。Gemini 额度查询已暂停，请重试移除。",
+        geminiAppOpenUsagePage: "打开 gemini.google.com/usage",
+        geminiAppNoCookie: "请在 设置 → Google AI 粘贴 gemini.google.com 的 Cookie。",
+        geminiAppUnauthorized: "Gemini 拒绝了 Cookie 或登录已过期。请在 设置 → Google AI 重新从 gemini.google.com/usage 复制 Cookie。",
+        geminiAppRateLimited: "Gemini 限流了用量查询，下次刷新时会再试。",
+        geminiAppServerError: { "Gemini 返回 HTTP \($0)，下次刷新时会再试。" },
+        geminiAppMalformed: "Gemini 返回的用量结构已变化或不包含额度数据。",
+        geminiAppNoWindows: "当前 Google 账号没有返回 Gemini 应用的 5 小时或每周额度窗口。",
+        geminiAppNetworkError: "无法连接 gemini.google.com（网络错误），下次刷新时会再试。",
+        geminiAppWindowIdle: "Gemini 应用没有报告这个窗口。",
 
         chartToggle: "用量随时间变化",
         chartEmpty: "这个窗口还没有记录。AIUsage 从现在开始保存历史。",
